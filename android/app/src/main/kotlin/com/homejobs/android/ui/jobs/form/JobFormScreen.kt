@@ -1,7 +1,9 @@
 package com.homejobs.android.ui.jobs.form
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -238,17 +240,28 @@ private fun DateField(
 ) {
     var showPicker by remember { mutableStateOf(false) }
 
-    OutlinedTextField(
-        value = value?.toDisplayDate().orEmpty(),
-        onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
-        placeholder = { Text("Not set") },
-        trailingIcon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { showPicker = true },
-    )
+    // A readOnly OutlinedTextField still consumes taps internally for focus/cursor handling, so a
+    // `.clickable` attached directly to it never fires reliably. An invisible clickable Box
+    // stacked on top intercepts the tap first instead.
+    Box {
+        OutlinedTextField(
+            value = value?.toDisplayDate().orEmpty(),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            placeholder = { Text("Not set") },
+            trailingIcon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { showPicker = true },
+        )
+    }
 
     if (showPicker) {
         val initialMillis = value?.let {
