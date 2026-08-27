@@ -35,8 +35,10 @@ services:
     volumes:
       - attachments:/data/attachments
     ports:
-      # Bind to loopback only; put Caddy/Traefik in front for real exposure.
-      - "127.0.0.1:${HTTP_PORT:-8080}:${HTTP_PORT:-8080}"
+      # Defaults to loopback only. Override BIND_ADDRESS in .env to expose it,
+      # e.g. to your Tailscale IP (`tailscale ip -4`) for direct access from
+      # other tailnet devices without a reverse proxy in front.
+      - "${BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:${HTTP_PORT:-8080}"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${HTTP_PORT:-8080}/health || exit 1"]
       interval: 15s
