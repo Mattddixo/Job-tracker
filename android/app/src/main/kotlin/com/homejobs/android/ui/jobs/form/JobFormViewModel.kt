@@ -1,0 +1,79 @@
+package com.homejobs.android.ui.jobs.form
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.homejobs.android.domain.model.JobUpsertInput
+import com.homejobs.android.domain.repository.JobRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class JobFormViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
+    private val repository: JobRepository,
+) : ViewModel() {
+
+    private val jobId: Long? = (savedStateHandle.get<String>("jobId"))?.toLongOrNull()
+
+    private val _uiState = MutableStateFlow(JobFormUiState(isEditing = jobId != null, isLoading = jobId != null))
+    val uiState: StateFlow<JobFormUiState> = _uiState.asStateFlow()
+
+    init {
+        val id = jobId
+        if (id != null) {
+            viewModelScope.launch {
+                repository.refreshJob(id)
+                val job = repository.observeJob(id).filterNotNull().first()
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    input = JobUpsertInput(
+                        title = job.title,
+                        category = job.category,
+                        location = job.location,
+                        vendorName = job.vendorName,
+                        vendorContact = job.vendorContact,
+                        status = job.status,
+                        quotedCost = job.quotedCost,
+                        actualCost = job.actualCost,
+                        predictedHours = job.predictedHours,
+                        actualHours = job.actualHours,
+                        scheduledDate = job.scheduledDate,
+                        completedDate = job.completedDate,
+                        warrantyExpiry = job.warrantyExpiry,
+                        paymentStatus = job.paymentStatus,
+                        paymentMethod = job.paymentMethod,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun updateInput(transform: (JobUpsertInput) -> JobUpsertInput) {
+        _uiState.value = _uiState.value.copy(input = transform(_uiState.value.input), errors = emptyList())
+    }
+
+    fun save(onSaved: () -> Unit) {
+        val input = _uiState.value.input
+        val errors = input.validate()
+        if (errors.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(errors = errors)
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true, saveError = null)
+            val result = jobId?.let { repository.updateJob(it, input) } ?: repository.createJob(input)
+            result
+                .onSuccess { onSaved() }
+                .onFailure { _uiState.value = _uiState.value.copy(saveError = it.message ?: "Failed to save job") }
+            _uiState.value = _uiState.value.copy(isSaving = false)
+        }
+    }
+}
