@@ -83,6 +83,14 @@ Open **Settings** (gear icon on the job list) and enter:
 
 Both are stored in DataStore on-device; nothing is hardcoded in the app.
 
+**Cleartext (plain `http://`) traffic is allowed** (`android:usesCleartextTraffic="true"` in the
+manifest) — Android blocks it by default from API 28 on. This app is meant to be pointed at a
+server reachable only over Tailscale (or another private/VPN network), where the transport is
+already encrypted at the WireGuard layer even though the URL says `http://`; Android has no way
+to know that; it just sees a non-TLS scheme and refuses it. If you ever point this app at a
+server over the open internet, use `https://` (e.g. via a Caddy/Traefik reverse proxy) instead —
+cleartext being *allowed* doesn't make plain HTTP over the public internet safe.
+
 ## Running it
 
 1. Open the `android/` directory in Android Studio (Koala or newer recommended).
