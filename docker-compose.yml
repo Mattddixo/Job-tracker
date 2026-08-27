@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      DATABASE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      API_KEY: ${API_KEY}
+      CORS_ALLOWED_HOST: ${CORS_ALLOWED_HOST:-}
+      ATTACHMENTS_DIR: /data/attachments
+    volumes:
+      - attachments:/data/attachments
+    ports:
+      # Bind to loopback only; put Caddy/Traefik in front for real exposure.
+      - "127.0.0.1:${HTTP_PORT:-8080}:${HTTP_PORT:-8080}"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${HTTP_PORT:-8080}/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - internal
+
+volumes:
+  db-data:
+  attachments:
+
+networks:
+  internal:

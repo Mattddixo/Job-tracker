@@ -1,0 +1,29 @@
+# Environment
+.env
+
+# Gradle / Kotlin (backend)
+backend/.gradle/
+backend/build/
+!backend/gradle/wrapper/gradle-wrapper.jar
+backend/out/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/*/build/
+android/.idea/
+android/local.properties
+android/*.iml
+android/.cxx/
+android/captures/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+
+# Attachment/dev data volumes if run locally without docker
+/data/
