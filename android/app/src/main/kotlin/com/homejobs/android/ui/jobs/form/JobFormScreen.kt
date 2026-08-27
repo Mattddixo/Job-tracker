@@ -5,6 +5,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,13 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,17 +36,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.homejobs.android.domain.model.JobStatus
+import com.homejobs.android.domain.model.JobUpsertInput
 import com.homejobs.android.domain.model.PaymentStatus
+import com.homejobs.android.ui.common.EnumDropdown
 import com.homejobs.android.ui.common.LoadingState
 import com.homejobs.android.ui.common.toDisplayDate
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,104 +79,123 @@ fun JobFormScreen(
         }
 
         val input = uiState.input
+        fun update(transform: (JobUpsertInput) -> JobUpsertInput) = viewModel.updateInput(transform)
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            OutlinedTextField(
-                value = input.title,
-                onValueChange = { text -> viewModel.updateInput { it.copy(title = text) } },
-                label = { Text("Title *") },
-                modifier = Modifier.fillMaxWidth(),
-                isError = uiState.errors.any { it.contains("Title") },
-            )
-            OutlinedTextField(
-                value = input.category.orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(category = text.ifBlank { null }) } },
-                label = { Text("Category") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = input.location.orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(location = text.ifBlank { null }) } },
-                label = { Text("Room / location") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = input.vendorName.orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(vendorName = text.ifBlank { null }) } },
-                label = { Text("Vendor / contractor") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = input.vendorContact.orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(vendorContact = text.ifBlank { null }) } },
-                label = { Text("Vendor contact") },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            FormSection(title = "Job Details") {
+                OutlinedTextField(
+                    value = input.title,
+                    onValueChange = { text -> update { it.copy(title = text) } },
+                    label = { Text("Title *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.errors.any { it.contains("Title") },
+                )
+                OutlinedTextField(
+                    value = input.category.orEmpty(),
+                    onValueChange = { text -> update { it.copy(category = text.ifBlank { null }) } },
+                    label = { Text("Category") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = input.location.orEmpty(),
+                    onValueChange = { text -> update { it.copy(location = text.ifBlank { null }) } },
+                    label = { Text("Room / location") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
-            EnumDropdown(
-                label = "Status",
-                options = JobStatus.entries,
-                selected = input.status,
-                optionLabel = { it.name.replace('_', ' ') },
-                onSelected = { status -> viewModel.updateInput { it.copy(status = status) } },
-            )
+            FormSection(title = "Vendor") {
+                OutlinedTextField(
+                    value = input.vendorName.orEmpty(),
+                    onValueChange = { text -> update { it.copy(vendorName = text.ifBlank { null }) } },
+                    label = { Text("Vendor / contractor") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = input.vendorContact.orEmpty(),
+                    onValueChange = { text -> update { it.copy(vendorContact = text.ifBlank { null }) } },
+                    label = { Text("Vendor contact") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
-            NumberField(
-                label = "Quoted cost ($)",
-                initialValue = input.quotedCost,
-                onValueChange = { value -> viewModel.updateInput { it.copy(quotedCost = value) } },
-            )
-            NumberField(
-                label = "Actual cost ($)",
-                initialValue = input.actualCost,
-                onValueChange = { value -> viewModel.updateInput { it.copy(actualCost = value) } },
-            )
-            NumberField(
-                label = "Predicted hours",
-                initialValue = input.predictedHours,
-                onValueChange = { value -> viewModel.updateInput { it.copy(predictedHours = value) } },
-            )
-            NumberField(
-                label = "Actual hours",
-                initialValue = input.actualHours,
-                onValueChange = { value -> viewModel.updateInput { it.copy(actualHours = value) } },
-            )
+            FormSection(title = "Status & Schedule") {
+                EnumDropdown(
+                    label = "Status",
+                    options = JobStatus.entries,
+                    selected = input.status,
+                    optionLabel = { it.name.replace('_', ' ') },
+                    onSelected = { status -> update { it.copy(status = status) } },
+                )
+                DateField(
+                    label = "Scheduled date",
+                    value = input.scheduledDate,
+                    onValueChange = { date -> update { it.copy(scheduledDate = date) } },
+                )
+                DateField(
+                    label = "Completed date",
+                    value = input.completedDate,
+                    onValueChange = { date -> update { it.copy(completedDate = date) } },
+                )
+                DateField(
+                    label = "Warranty expiry",
+                    value = input.warrantyExpiry,
+                    onValueChange = { date -> update { it.copy(warrantyExpiry = date) } },
+                )
+            }
 
-            DateField(
-                label = "Scheduled date",
-                value = input.scheduledDate,
-                onValueChange = { date -> viewModel.updateInput { it.copy(scheduledDate = date) } },
-            )
-            DateField(
-                label = "Completed date",
-                value = input.completedDate,
-                onValueChange = { date -> viewModel.updateInput { it.copy(completedDate = date) } },
-            )
-            DateField(
-                label = "Warranty expiry",
-                value = input.warrantyExpiry,
-                onValueChange = { date -> viewModel.updateInput { it.copy(warrantyExpiry = date) } },
-            )
+            FormSection(title = "Cost Tracking") {
+                NumberField(
+                    label = "Quoted cost ($)",
+                    initialValue = input.quotedCost,
+                    onValueChange = { value -> update { it.copy(quotedCost = value) } },
+                )
+                NumberField(
+                    label = "Actual cost ($)",
+                    initialValue = input.actualCost,
+                    onValueChange = { value -> update { it.copy(actualCost = value) } },
+                )
+                val costVariance = variance(input.quotedCost, input.actualCost)
+                VarianceLine(label = "Cost variance", variance = costVariance, format = ::formatCostVariance)
+            }
 
-            EnumDropdown(
-                label = "Payment status",
-                options = PaymentStatus.entries,
-                selected = input.paymentStatus,
-                optionLabel = { it.name },
-                onSelected = { status -> viewModel.updateInput { it.copy(paymentStatus = status) } },
-            )
-            OutlinedTextField(
-                value = input.paymentMethod.orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(paymentMethod = text.ifBlank { null }) } },
-                label = { Text("Payment method") },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            FormSection(title = "Time Tracking") {
+                NumberField(
+                    label = "Predicted hours",
+                    initialValue = input.predictedHours,
+                    onValueChange = { value -> update { it.copy(predictedHours = value) } },
+                )
+                NumberField(
+                    label = "Actual hours",
+                    initialValue = input.actualHours,
+                    onValueChange = { value -> update { it.copy(actualHours = value) } },
+                )
+                val timeVariance = variance(input.predictedHours, input.actualHours)
+                VarianceLine(label = "Time variance", variance = timeVariance, format = ::formatHoursVariance)
+            }
+
+            FormSection(title = "Payment") {
+                EnumDropdown(
+                    label = "Payment status",
+                    options = PaymentStatus.entries,
+                    selected = input.paymentStatus,
+                    optionLabel = { it.name },
+                    onSelected = { status -> update { it.copy(paymentStatus = status) } },
+                )
+                OutlinedTextField(
+                    value = input.paymentMethod.orEmpty(),
+                    onValueChange = { text -> update { it.copy(paymentMethod = text.ifBlank { null }) } },
+                    label = { Text("Payment method") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             if (uiState.errors.isNotEmpty()) {
                 Column {
@@ -196,6 +217,45 @@ fun JobFormScreen(
             }
         }
     }
+}
+
+/** actual − quoted/predicted, the same convention as Job.costVariance/timeVariance. */
+private fun variance(planned: Double?, actual: Double?): Double? =
+    if (planned != null && actual != null) actual - planned else null
+
+private fun formatCostVariance(variance: Double): String =
+    (if (variance >= 0) "+$" else "-$") + "%.2f".format(abs(variance))
+
+private fun formatHoursVariance(variance: Double): String =
+    "%+.1f hrs".format(variance)
+
+@Composable
+private fun FormSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun VarianceLine(label: String, variance: Double?, format: (Double) -> String) {
+    if (variance == null) return
+    val color = when {
+        variance > 0 -> MaterialTheme.colorScheme.error
+        variance < 0 -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Text(
+        text = "$label: ${format(variance)}",
+        color = color,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
 }
 
 /**
@@ -296,42 +356,6 @@ private fun DateField(
             },
         ) {
             DatePicker(state = datePickerState)
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun <T> EnumDropdown(
-    label: String,
-    options: List<T>,
-    selected: T,
-    optionLabel: (T) -> String,
-    onSelected: (T) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-        OutlinedTextField(
-            value = optionLabel(selected),
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.fillMaxWidth().menuAnchor(),
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(optionLabel(option)) },
-                    onClick = {
-                        onSelected(option)
-                        expanded = false
-                    },
-                )
-            }
         }
     }
 }

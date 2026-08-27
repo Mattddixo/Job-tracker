@@ -29,7 +29,6 @@ class JobFormViewModel @Inject constructor(
         val id = jobId
         if (id != null) {
             viewModelScope.launch {
-                repository.refreshJob(id)
                 val job = repository.observeJob(id).filterNotNull().first()
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -69,10 +68,13 @@ class JobFormViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, saveError = null)
-            val result = jobId?.let { repository.updateJob(it, input) } ?: repository.createJob(input)
-            result
-                .onSuccess { onSaved() }
-                .onFailure { _uiState.value = _uiState.value.copy(saveError = it.message ?: "Failed to save job") }
+            try {
+                val id = jobId
+                if (id != null) repository.updateJob(id, input) else repository.createJob(input)
+                onSaved()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(saveError = e.message ?: "Failed to save job")
+            }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }

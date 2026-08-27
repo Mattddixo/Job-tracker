@@ -5,8 +5,8 @@ import com.homejobs.android.domain.model.JobFilter
 import com.homejobs.android.domain.model.JobStatus
 
 /**
- * Active/Completed/All is a view-level grouping, not a server-side query: a household's job list
- * is small enough that filtering it in memory (same reasoning as the in-memory sort in
+ * Active/Completed/All is a view-level grouping, not a database query: a household's job list is
+ * small enough that filtering it in memory (same reasoning as the in-memory sort in
  * JobRepositoryImpl) is simpler than adding multi-status filtering to the Room query.
  */
 enum class JobListTab {
@@ -33,6 +33,4 @@ data class JobListUiState(
     val jobs: List<Job> = emptyList(),
     val filter: JobFilter = JobFilter(),
     val selectedTab: JobListTab = JobListTab.ACTIVE,
-    val isLoading: Boolean = true,
-    val errorMessage: String? = null,
 )

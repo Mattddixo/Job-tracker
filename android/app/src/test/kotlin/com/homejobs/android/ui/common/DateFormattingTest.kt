@@ -3,6 +3,8 @@ package com.homejobs.android.ui.common
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
 class DateFormattingTest {
 
@@ -17,18 +19,16 @@ class DateFormattingTest {
     }
 
     @Test
-    fun `toDisplayDateTime drops fractional seconds and the raw ISO separator`() {
-        // Instant strings from the backend can carry however many fractional-second digits
-        // Postgres happened to store; the display format must never leak them.
-        val formatted = "2026-02-10T18:32:07.123456789Z".toDisplayDateTime()
+    fun `toDisplayDateTime never shows sub-minute precision`() {
+        val millis = LocalDate.of(2026, 2, 10)
+            .atTime(18, 32, 7, 123_456_789)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        val formatted = millis.toDisplayDateTime()
 
         assertFalse(formatted.contains("."))
-        assertFalse(formatted.contains("T"))
-        assertFalse(formatted.contains("Z"))
-    }
-
-    @Test
-    fun `toDisplayDateTime falls back to the raw string on malformed input`() {
-        assertEquals("not-an-instant", "not-an-instant".toDisplayDateTime())
+        assertFalse(formatted.contains(":07"))
     }
 }

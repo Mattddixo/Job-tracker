@@ -1,12 +1,3 @@
-# Environment
-.env
-
-# Gradle / Kotlin (backend)
-backend/.gradle/
-backend/build/
-!backend/gradle/wrapper/gradle-wrapper.jar
-backend/out/
-
 # Android / Gradle
 android/.gradle/
 android/build/
@@ -24,6 +15,3 @@ android/captures/
 
 # OS
 .DS_Store
-
-# Attachment/dev data volumes if run locally without docker
-/data/

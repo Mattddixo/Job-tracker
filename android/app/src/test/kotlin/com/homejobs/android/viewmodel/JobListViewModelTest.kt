@@ -11,7 +11,6 @@ import com.homejobs.android.ui.jobs.list.JobListTab
 import com.homejobs.android.ui.jobs.list.JobListViewModel
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -38,35 +37,20 @@ class JobListViewModelTest {
         warrantyExpiry = null,
         paymentStatus = PaymentStatus.UNPAID,
         paymentMethod = null,
-        createdAt = "2026-01-01T00:00:00Z",
-        updatedAt = "2026-01-01T00:00:00Z",
+        createdAt = 0L,
+        updatedAt = 0L,
     )
 
     @Test
-    fun `refreshes on init and exposes cached jobs`() = runTest {
+    fun `exposes cached jobs from the repository`() = runTest {
         val repository = FakeJobRepository()
-        repository.jobsState.value = listOf(job(1, "Fix roof"))
+        repository.jobsState.value = listOf(job(1, "Fix roof", status = JobStatus.SCHEDULED))
 
         val viewModel = JobListViewModel(repository)
 
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals(1, state.jobs.size)
-            assertNull(state.errorMessage)
-        }
-        assertEquals(1, repository.refreshJobsCallCount)
-    }
-
-    @Test
-    fun `refresh failure surfaces an error message`() = runTest {
-        val repository = FakeJobRepository()
-        repository.refreshJobsResult = Result.failure(RuntimeException("offline"))
-
-        val viewModel = JobListViewModel(repository)
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertEquals("offline", state.errorMessage)
         }
     }
 

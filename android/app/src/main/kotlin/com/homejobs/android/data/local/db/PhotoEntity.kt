@@ -5,21 +5,22 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/** [filePath] points at a file this app copied into its own private storage — see PhotoStorage. */
 @Entity(
-    tableName = "job_notes",
+    tableName = "photos",
     foreignKeys = [
         ForeignKey(
-            entity = JobEntity::class,
+            entity = JobNoteEntity::class,
             parentColumns = ["id"],
-            childColumns = ["jobId"],
+            childColumns = ["noteId"],
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("jobId")],
+    indices = [Index("noteId")],
 )
-data class JobNoteEntity(
+data class PhotoEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val jobId: Long,
-    val timestamp: Long,
-    val body: String,
+    val noteId: Long,
+    val filePath: String,
+    val createdAt: Long,
 )

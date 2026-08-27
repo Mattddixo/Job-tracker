@@ -4,11 +4,12 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [JobEntity::class, JobNoteEntity::class],
-    version = 1,
+    entities = [JobEntity::class, JobNoteEntity::class, PhotoEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun jobDao(): JobDao
     abstract fun jobNoteDao(): JobNoteDao
+    abstract fun photoDao(): PhotoDao
 }

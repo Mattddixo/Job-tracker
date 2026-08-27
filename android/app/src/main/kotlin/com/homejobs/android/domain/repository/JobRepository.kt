@@ -7,23 +7,22 @@ import com.homejobs.android.domain.model.JobUpsertInput
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Room is the single source of truth for reads (offline-friendly): [observeJobs]/[observeJob]/
- * [observeNotes] always return what's on-device, while the `refresh*`/write operations talk to
- * the backend and, on success, update the local cache so observers pick up the change.
+ * Room is the only store — there's no backend to sync with, so every read is a live Flow off the
+ * local database and every write returns as soon as it's committed there.
  */
 interface JobRepository {
     fun observeJobs(filter: JobFilter): Flow<List<Job>>
     fun observeJob(id: Long): Flow<Job?>
     fun observeNotes(jobId: Long): Flow<List<JobNote>>
 
-    suspend fun refreshJobs(): Result<Unit>
-    suspend fun refreshJob(id: Long): Result<Unit>
-    suspend fun refreshNotes(jobId: Long): Result<Unit>
+    suspend fun createJob(input: JobUpsertInput): Job
+    suspend fun updateJob(id: Long, input: JobUpsertInput): Job
+    suspend fun deleteJob(id: Long)
 
-    suspend fun createJob(input: JobUpsertInput): Result<Job>
-    suspend fun updateJob(id: Long, input: JobUpsertInput): Result<Job>
-    suspend fun deleteJob(id: Long): Result<Unit>
+    /** [photoPaths] are app-private file paths already copied in by PhotoStorage. */
+    suspend fun addNote(jobId: Long, body: String, photoPaths: List<String> = emptyList()): JobNote
+    suspend fun deleteNote(jobId: Long, noteId: Long)
 
-    suspend fun addNote(jobId: Long, body: String): Result<JobNote>
-    suspend fun deleteNote(jobId: Long, noteId: Long): Result<Unit>
+    suspend fun addPhotoToNote(noteId: Long, filePath: String)
+    suspend fun deletePhoto(photoId: Long)
 }

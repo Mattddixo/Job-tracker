@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "jobs")
 data class JobEntity(
-    @PrimaryKey val id: Long,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val category: String?,
     val location: String?,
@@ -21,6 +21,6 @@ data class JobEntity(
     val warrantyExpiry: String?,
     val paymentStatus: String,
     val paymentMethod: String?,
-    val createdAt: String,
-    val updatedAt: String,
+    val createdAt: Long,
+    val updatedAt: Long,
 )

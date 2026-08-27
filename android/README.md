@@ -1,117 +1,101 @@
 # Home Jobs Tracker — Android
 
-Native Kotlin client for the Home Jobs Tracker backend: job list with filtering/sorting, job
-detail with computed cost/time variance and a notes timeline, a create/edit form, and a settings
-screen to point the app at your own server.
+A standalone native Kotlin app for tracking household jobs/projects: an Active/Completed/All
+job list sorted however you like, a job detail screen with computed cost/time variance and a
+photo-backed notes timeline, and a create/edit form organized the way a project actually gets
+managed (details → vendor → status & schedule → cost tracking → time tracking → payment).
+
+Everything is local. There is no backend, no account, no network permission in the manifest —
+Room is the only store.
 
 > **Build status**: this module was written in a sandboxed environment with no Android SDK and
 > no network access to Google's Maven repository (`dl.google.com` / `maven.google.com` are
-> blocked by that sandbox's egress policy), so **it has not been compiled or run here**. The
-> backend was fully build- and test-verified; this module was written carefully against known
-> Ktor/Room/Retrofit/Hilt/Compose APIs but needs a real build (Android Studio or a machine with
-> the Android SDK + normal internet access) as its first verification step. Please run
-> `./gradlew build` and `./gradlew test` after cloning, before relying on it.
+> blocked by that sandbox's egress policy), so **it has not been compiled or run here**. It was
+> written carefully against known Room/Hilt/Compose/Coil APIs and reviewed line-by-line, but
+> needs a real build (Android Studio, or a machine with the Android SDK and normal internet
+> access) as its first verification step. Please run `./gradlew build` and `./gradlew test`
+> after cloning, before relying on it.
 
 ## Stack
 
 - Jetpack Compose (Material 3) for UI, single-activity
 - MVVM: `ViewModel` + `StateFlow`, no business logic in composables
 - Kotlin Coroutines/Flow throughout
-- Retrofit + OkHttp for networking, kotlinx.serialization for JSON
-- Room as the local cache (offline-friendly reads)
+- Room as the **only** persistence layer (no network, no remote sync)
 - Hilt for dependency injection
-- DataStore (Preferences) for settings (server URL, API token)
+- Coil for loading locally-stored photo files into Compose
 
 ## Project layout
 
 ```
 app/src/main/kotlin/com/homejobs/android/
-  domain/            pure Kotlin models + repository interfaces — no Android/Room/Retrofit types
+  domain/            pure Kotlin models + the JobRepository interface — no Room/Android types
   data/
-    local/db/         Room entities, DAOs, database
-    local/datastore/  settings (server URL, API token) persistence
-    remote/           Retrofit API interface, DTOs, dynamic base-URL interceptor
-    repository/       repository implementations + DTO/Entity/domain mappers
-  di/                 Hilt modules (network, database, repositories, app-scope)
+    local/db/         Room entities, DAOs, database (jobs, job_notes, photos)
+    local/photo/       PhotoStorage — copies camera/gallery images into app-private storage
+    repository/       JobRepositoryImpl (Room-backed) + Entity/domain mappers
+  di/                 Hilt modules (database, repository)
   ui/
-    jobs/list/        job list screen + ViewModel
-    jobs/detail/       job detail + timeline screen + ViewModel
-    jobs/form/         create/edit form + ViewModel
-    settings/          settings screen + ViewModel
+    jobs/list/        job list screen + ViewModel (Active/Completed/All tabs, sort)
+    jobs/detail/       job detail + notes timeline + photo capture/viewer + ViewModel
+    jobs/form/         sectioned create/edit form + ViewModel
     navigation/        single-activity NavHost + routes
     theme/             Material 3 theme
-    common/            shared loading/empty/error composables
+    common/            shared loading/empty/error composables, date formatting, EnumDropdown
 app/src/test/kotlin/com/homejobs/android/
-  fakes/              hand-written fakes for JobRepository, DAOs, API service
+  fakes/              hand-written fakes for JobRepository and the Room DAOs
   viewmodel/          ViewModel unit tests
   repository/         JobRepositoryImpl unit tests
 ```
 
 ## Architecture notes
 
-- **Repository pattern, Room as source of truth for reads.** `observeJobs`/`observeJob`/
-  `observeNotes` always return what's cached on-device; `refreshJobs()`/`refreshJob()`/
-  `refreshNotes()` hit the network and, on success, update the cache so the Flow-based UI picks
-  up the change automatically. This is what makes the list/detail screens work offline once
-  they've been loaded at least once.
-- **Writes are network-first**, not queued for later sync: `createJob`/`updateJob`/`deleteJob`/
-  `addNote`/`deleteNote` call the API immediately and return `Result<T>`, updating the local cache
-  only on success. A full offline write queue (create/edit while offline, sync later, handle
-  conflicts) is real complexity that didn't seem worth it for a single-user household tool talking
-  to a server on the same home network — this can be added later without changing the repository
-  interface's shape.
-- **Filtering happens in SQL (Room), sorting happens in memory.** Room can't bind a column name
-  as an `ORDER BY` parameter, and a household's job list is never going to be large enough for
-  that to matter — `JobRepositoryImpl` fetches the filtered rows and applies a `Comparator` in
-  Kotlin.
-- **Active/Completed/All is a UI-level grouping, not a repository filter.** `JobListTab` (in
+- **Room is the only store.** No network layer, no `Result<T>` wrapping for network failure —
+  repository methods either return the value directly or, for the rare genuinely-unexpected
+  local error, let the exception propagate to the caller (ViewModels catch it where a
+  user-facing message makes sense, e.g. saving a job).
+- **Job/note/photo ids are on-device auto-generated** (Room `autoGenerate = true`), not
+  server-assigned. Installing this version over an older client/server build wipes existing
+  local data — see the git history if you need the previous schema.
+- **Active/Completed/All is a UI-level grouping, not a database query.** `JobListTab` (in
   `ui/jobs/list`) buckets by status purely in `JobListViewModel`, on top of whatever
-  `observeJobs(filter)` already returned — same "small dataset, do it in memory" reasoning as
-  sorting above. The job list defaults to the Active tab so a growing pile of finished jobs
-  doesn't bury what's still open; Completed and All are one tap away.
+  `observeJobs(filter)` already returned — a household's job list is small enough that doing
+  this in memory is simpler than teaching Room to filter on a set of statuses. Defaults to
+  Active so finished jobs don't bury what's still open.
+- **Sorting is also in-memory**, for the same reason, and now includes a `JobSortField` picker
+  in the list screen (not just direction) — sort by scheduled date to see what's coming up
+  next, by cost/time variance to see what's over budget, etc.
+- **Photos are copied into app-private storage, never referenced by their original Uri.** A
+  gallery pick's `content://` Uri is only guaranteed readable briefly (no persisted
+  permission); a camera capture is written by a different app entirely. `PhotoStorage` copies
+  (or, for the camera, directs the capture directly) into `context.filesDir/photos/`, and only
+  that stable file path is ever stored in Room. A `FileProvider` (declared in the manifest,
+  paths in `res/xml/file_paths.xml`) is what lets the camera app write into that private
+  directory in the first place.
+- **Notes can be photo-only.** A note requires either a non-blank body or at least one photo,
+  not both — e.g. attaching a "before" photo with no comment is a valid timeline entry.
 - **Job-form number fields keep their own text buffer.** Deriving the displayed text from the
   parsed `Double` on every recomposition (e.g. `1.0.toString()`) would rewrite "1" to "1.0"
   mid-keystroke, making it impossible to type "12.5". `NumberField` seeds a local `String` once
-  (the form already blocks on a loading state until any existing job data has arrived, so the
-  seed value is correct in both create and edit mode) and only pushes the parsed value up to the
-  ViewModel; the field never re-derives its text from that value.
-- **Date fields use a real `DatePicker`, not typed text.** Free-text "YYYY-MM-DD" entry invites
-  malformed dates for no benefit; `DateField` opens a Material3 date picker and stores/round-trips
-  through UTC-midnight epoch millis (the convention `DatePicker` itself uses) to avoid the classic
-  off-by-one-day bug from mixing in the device's local time zone.
-- **Dynamic base URL.** Retrofit is built once against a placeholder base URL;
-  `DynamicBaseUrlInterceptor` rewrites the scheme/host/port (and preserves any reverse-proxy path
-  prefix from the configured server URL) and attaches the bearer token on every request, reading
-  the latest value from a `StateFlow` backed by DataStore. This is what lets the Settings screen
-  change the server URL/token at runtime with no app restart.
-- **`Result<T>` over exceptions crossing layers.** Repository methods that talk to the network
-  return `Result<T>`; ViewModels turn a `Result.failure` into a user-facing `errorMessage` string
-  rather than letting a raw `IOException`/`HttpException` reach the UI layer.
-
-## Configuring the app
-
-Open **Settings** (gear icon on the job list) and enter:
-
-- **Server URL** — e.g. `https://jobs.example.com` if you've put the backend behind a reverse
-  proxy, or `http://<your-server-ip>:8080` for direct access on your home network.
-- **API key** — the same value you set as `API_KEY` in the backend's `.env`.
-
-Both are stored in DataStore on-device; nothing is hardcoded in the app.
-
-**Cleartext (plain `http://`) traffic is allowed** (`android:usesCleartextTraffic="true"` in the
-manifest) — Android blocks it by default from API 28 on. This app is meant to be pointed at a
-server reachable only over Tailscale (or another private/VPN network), where the transport is
-already encrypted at the WireGuard layer even though the URL says `http://`; Android has no way
-to know that; it just sees a non-TLS scheme and refuses it. If you ever point this app at a
-server over the open internet, use `https://` (e.g. via a Caddy/Traefik reverse proxy) instead —
-cleartext being *allowed* doesn't make plain HTTP over the public internet safe.
+  (the form blocks on a loading state until any existing job data has arrived, so the seed
+  value is correct in both create and edit mode) and only pushes the parsed value up to the
+  ViewModel.
+- **Date fields use a real `DatePicker`**, opened via an invisible clickable `Box` layered over
+  a read-only `OutlinedTextField` — attaching `.clickable` directly to a read-only text field is
+  a well-known Compose gotcha (the field still consumes the tap internally for its own
+  focus/cursor handling) — and round-trip through UTC-midnight epoch millis (the convention
+  `DatePicker` itself uses) to avoid the classic off-by-one-day bug from mixing in the device's
+  local time zone.
+- **Cost/time variance is shown live in the form itself**, not just on the detail screen —
+  typing an actual cost immediately shows how far over/under quote it is, in the same
+  actual-minus-quoted convention as `Job.costVariance`.
 
 ## Running it
 
 1. Open the `android/` directory in Android Studio (Koala or newer recommended).
-2. Let Gradle sync — this needs internet access to `google()`/`mavenCentral()` the first time.
+2. Let Gradle sync — needs normal internet access the first time (this is the first real
+   compile check; see the build-status note above).
 3. Run the `app` configuration on an emulator or device (minSdk 26 / Android 8.0+).
-4. Point it at a running backend via the Settings screen (see above).
 
 From the command line, once you have the Android SDK installed and `ANDROID_HOME` set:
 
@@ -120,11 +104,27 @@ cd android
 ./gradlew assembleDebug
 ```
 
-**Note**: unlike `backend/`, this module does not include a committed Gradle wrapper
-(`gradlew`/`gradle-wrapper.jar`) — generating one requires resolving the Android Gradle Plugin
-from `google()`, which wasn't reachable in the sandbox this was built in. Android Studio will
-generate the wrapper for you automatically on first sync, or run `gradle wrapper --gradle-version
-8.10.2` once yourself with a local Gradle install and Android SDK/network access.
+**Note**: this module does not include a committed Gradle wrapper (`gradlew`/
+`gradle-wrapper.jar`) — generating one requires resolving the Android Gradle Plugin from
+`google()`, which wasn't reachable in the sandbox this was built in. Android Studio generates
+the wrapper automatically on first sync, or run `gradle wrapper --gradle-version 8.10.2` once
+yourself with a local Gradle install and Android SDK/network access.
+
+## Permissions
+
+None beyond what's needed to write photo files the app itself creates. No `INTERNET`
+permission — there's nothing to talk to. The camera and gallery pickers are launched via
+system intents (`ACTION_IMAGE_CAPTURE`, the Android Photo Picker), so neither needs a runtime
+permission request from this app.
+
+## Backing up your data
+
+Since everything lives in this app's local database and private photo storage, uninstalling
+the app or losing the device loses your data. Android's automatic backup
+(`android:allowBackup="true"`, already set) will back up app data to the user's Google account
+on supported devices, but that's not guaranteed for large photo storage and isn't a substitute
+for something you've verified. There's no in-app export yet — worth adding if this becomes
+something you rely on long-term.
 
 ## Tests
 
@@ -133,16 +133,18 @@ cd android
 ./gradlew test
 ```
 
-Unit tests use hand-written fakes for `JobRepository`, `JobDao`/`JobNoteDao`, and
-`HomeJobsApiService` (rather than Robolectric/instrumentation), so they run as plain JVM tests —
-no emulator, no Android SDK at test-run time. Covered:
+Unit tests use hand-written fakes for `JobRepository` and the Room DAOs (rather than
+Robolectric/instrumentation), so they run as plain JVM tests — no emulator, no Android SDK at
+test-run time. `PhotoStorage` itself (real file I/O against `Context.filesDir`) is mocked with
+MockK in repository tests rather than faked by hand, since it's a thin platform adapter with no
+logic worth re-implementing in a fake. Covered:
 
-- `JobRepositoryImplTest` — refresh populates/updates the cache, a failed refresh preserves
-  stale cached data, server-side deletions are reflected on the next refresh, create/delete/notes
-  round-trip through the fake API and cache.
-- `JobListViewModelTest` — initial refresh, refresh-failure error surfacing, status filtering,
-  Active/Completed/All tab grouping, delete delegation.
+- `JobRepositoryImplTest` — create/update (preserves `createdAt`)/delete a job, delete cascades
+  to photo file cleanup, notes round-trip with their photos, adding/removing a photo from an
+  existing note, status filtering.
+- `JobListViewModelTest` — status filtering, Active/Completed/All tab grouping, delete
+  delegation.
 - `JobFormViewModelTest` — validation blocks save on bad input, valid input creates a job and
   fires the callback, editing pre-populates the form from the repository.
-- `DateFormattingTest` — date/date-time display formatting, including that fractional seconds
-  and the raw ISO separators never leak into what's shown.
+- `DateFormattingTest` — date/date-time display formatting, including that sub-minute
+  precision never leaks into what's shown.

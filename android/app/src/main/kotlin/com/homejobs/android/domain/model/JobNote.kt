@@ -3,8 +3,16 @@ package com.homejobs.android.domain.model
 data class JobNote(
     val id: Long,
     val jobId: Long,
-    val timestamp: String,
+    val timestamp: Long,
     val body: String,
+    val photos: List<Photo> = emptyList(),
+)
+
+data class Photo(
+    val id: Long,
+    val noteId: Long,
+    val filePath: String,
+    val createdAt: Long,
 )
 
 data class JobUpsertInput(

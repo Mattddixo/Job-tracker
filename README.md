@@ -1,38 +1,21 @@
 # Home Jobs Tracker
 
-A self-hosted app for tracking household jobs/projects — repairs, renovations, contractor
-work — with quoted-vs-actual cost and time comparison. Two pieces:
+A standalone Android app for tracking household jobs/projects — repairs, renovations,
+contractor work — with quoted-vs-actual cost and time comparison, a photo-backed notes
+timeline, and Active/Completed/All views so you always know what's open and what's next.
 
-- **[`backend/`](./backend)** — a Kotlin + Ktor REST API backed by PostgreSQL, meant to run as a
-  small Docker Compose stack on a home server behind a reverse proxy (Caddy/Traefik).
-- **[`android/`](./android)** — a native Kotlin (Jetpack Compose) client for it.
+Everything lives on-device (Room). There's no server, no account, no network permission —
+see [`android/README.md`](./android) for the architecture and setup instructions.
 
-Each has its own README with full setup instructions, architecture notes, and test instructions.
-This file is the map.
+## Why no backend
 
-## Quick start
-
-```bash
-cp .env.example .env
-# edit .env — set POSTGRES_PASSWORD and API_KEY (openssl rand -hex 32 for the latter)
-
-docker compose up --build
-curl http://localhost:8080/health
-
-BASE_URL=http://localhost:8080 API_KEY=<your API_KEY> ./backend/scripts/seed.sh
-```
-
-Then open the `android/` project in Android Studio, run it, and enter your server URL + API key
-in the app's Settings screen.
-
-## Layout
-
-```
-/backend    Ktor API, Postgres schema (Flyway), tests, Dockerfile — see backend/README.md
-/android    Jetpack Compose app (MVVM, Room, Retrofit, Hilt) — see android/README.md
-docker-compose.yml   Postgres + API, named volumes, health checks, restart policies
-.env.example         all backend configuration, no secrets committed
-```
+This started as a client/server app (Kotlin backend + Android client) for a homelab
+deployment. In practice the actual use case — one person tracking their own jobs — never
+needed multi-device or multi-user access, so the server was pure operational overhead: a
+Docker host to keep running, a Tailscale network to maintain, secrets to manage, backend
+code to redeploy on every change. None of that buys anything a single-user app doesn't
+already get for free from Room. The backend was retired; this repo is Android-only now (its
+history is still in git if a server ever becomes worth reviving).
 
 ## Data model
 
@@ -40,25 +23,10 @@ docker-compose.yml   Postgres + API, named volumes, health checks, restart polic
   in_progress → done → cancelled`), quoted/actual cost, predicted/actual hours, scheduled/
   completed/warranty dates, payment status + method. `costVariance` and `timeVariance`
   (`actual − quoted`) are always computed, never stored.
-- **JobNote**: a timestamped timeline entry on a job; cascade-deleted with the job.
-- **Attachment**: table exists for photo references (stored on disk, not in the DB); upload/serve
-  endpoints are the one item left as a stretch follow-up (see backend README).
-
-## Verification status
-
-The backend was built and its test suite run in the sandbox that produced this repo: `./gradlew
-build` and `./gradlew test` both pass. Two things were **not** runnable there for reasons
-external to the code and are the natural next steps when you set this up for real:
-
-- `docker compose up` and `./gradlew integrationTest` (Testcontainers) — both need to pull
-  container images from a registry, which that sandbox's network policy blocked.
-- The entire `android/` module — that sandbox had no Android SDK and no access to Google's Maven
-  repository (required for the Android Gradle Plugin, Room, Compose, etc.). It was written
-  carefully against known library APIs but needs a real build (Android Studio, or a machine with
-  the Android SDK and normal internet access) as its first compilation check.
-
-Both READMEs call this out again in context. Treat "run `docker compose up`" and "open `android/`
-in Android Studio" as the two remaining acceptance steps for this project, not optional extras.
+- **JobNote**: a timestamped timeline entry on a job, with zero or more attached photos;
+  deleted along with the job.
+- **Photo**: an image attached to a note (taken with the camera or picked from the gallery),
+  copied into the app's private storage — see the Android README for why.
 
 ## License
 

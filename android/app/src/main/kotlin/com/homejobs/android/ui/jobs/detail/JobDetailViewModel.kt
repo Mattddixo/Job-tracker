@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -21,70 +22,63 @@ class JobDetailViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val jobId: Long = checkNotNull(savedStateHandle["jobId"])
-
-    private val noteDraft = MutableStateFlow("")
-    private val isSubmittingNote = MutableStateFlow(false)
-    private val noteError = MutableStateFlow<String?>(null)
-    private val jobState = MutableStateFlow<UiState<com.homejobs.android.domain.model.Job>>(UiState.Loading)
+    private val composer = MutableStateFlow(NoteComposerState())
 
     val uiState: StateFlow<JobDetailUiState> = combine(
-        jobState,
+        repository.observeJob(jobId),
         repository.observeNotes(jobId),
-        noteDraft,
-        isSubmittingNote,
-        noteError,
-    ) { job, notes, draft, submitting, error ->
-        JobDetailUiState(job = job, notes = notes, noteDraft = draft, isSubmittingNote = submitting, noteError = error)
+        composer,
+    ) { job, notes, composerState ->
+        JobDetailUiState(
+            job = job?.let { UiState.Success(it) } ?: UiState.Empty,
+            notes = notes,
+            noteDraft = composerState.draft,
+            pendingPhotoPaths = composerState.pendingPhotoPaths,
+            isSubmittingNote = composerState.isSubmitting,
+            noteError = composerState.error,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JobDetailUiState())
 
-    init {
-        viewModelScope.launch {
-            repository.observeJob(jobId).collect { job ->
-                jobState.value = job?.let { UiState.Success(it) } ?: UiState.Empty
-            }
-        }
-        refresh()
-    }
-
-    fun refresh() {
-        viewModelScope.launch {
-            repository.refreshJob(jobId).onFailure { error ->
-                if (jobState.value !is UiState.Success) {
-                    jobState.value = UiState.Error(error.message ?: "Failed to load job")
-                }
-            }
-            repository.refreshNotes(jobId)
-        }
-    }
-
     fun updateNoteDraft(text: String) {
-        noteDraft.value = text
+        composer.update { it.copy(draft = text) }
+    }
+
+    fun addPendingPhoto(filePath: String) {
+        composer.update { it.copy(pendingPhotoPaths = it.pendingPhotoPaths + filePath) }
+    }
+
+    fun removePendingPhoto(filePath: String) {
+        composer.update { it.copy(pendingPhotoPaths = it.pendingPhotoPaths - filePath) }
     }
 
     fun submitNote() {
-        val body = noteDraft.value.trim()
-        if (body.isBlank()) return
+        val state = composer.value
+        val body = state.draft.trim()
+        if (body.isBlank() && state.pendingPhotoPaths.isEmpty()) return
+
         viewModelScope.launch {
-            isSubmittingNote.value = true
-            repository.addNote(jobId, body)
-                .onSuccess {
-                    noteDraft.value = ""
-                    noteError.value = null
-                }
-                .onFailure { noteError.value = it.message ?: "Failed to add note" }
-            isSubmittingNote.value = false
+            composer.update { it.copy(isSubmitting = true) }
+            try {
+                repository.addNote(jobId, body, state.pendingPhotoPaths)
+                composer.value = NoteComposerState()
+            } catch (e: Exception) {
+                composer.update { it.copy(isSubmitting = false, error = e.message ?: "Failed to add note") }
+            }
         }
     }
 
     fun deleteNote(noteId: Long) {
-        viewModelScope.launch {
-            repository.deleteNote(jobId, noteId).onFailure { noteError.value = it.message ?: "Failed to delete note" }
-        }
+        viewModelScope.launch { repository.deleteNote(jobId, noteId) }
+    }
+
+    fun deletePhoto(photoId: Long) {
+        viewModelScope.launch { repository.deletePhoto(photoId) }
     }
 
     fun deleteJob(onDeleted: () -> Unit) {
         viewModelScope.launch {
-            repository.deleteJob(jobId).onSuccess { onDeleted() }
+            repository.deleteJob(jobId)
+            onDeleted()
         }
     }
 }

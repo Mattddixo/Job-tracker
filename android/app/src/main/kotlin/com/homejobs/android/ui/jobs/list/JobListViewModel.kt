@@ -23,28 +23,18 @@ class JobListViewModel @Inject constructor(
 
     private val filter = MutableStateFlow(JobFilter())
     private val selectedTab = MutableStateFlow(JobListTab.ACTIVE)
-    private val isLoading = MutableStateFlow(true)
-    private val errorMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<JobListUiState> = combine(
         filter.flatMapLatest { repository.observeJobs(it) },
         filter,
         selectedTab,
-        isLoading,
-        errorMessage,
-    ) { jobs, currentFilter, tab, loading, error ->
+    ) { jobs, currentFilter, tab ->
         JobListUiState(
             jobs = jobs.filter { tab.matches(it.status) },
             filter = currentFilter,
             selectedTab = tab,
-            isLoading = loading,
-            errorMessage = error,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JobListUiState())
-
-    init {
-        refresh()
-    }
 
     fun updateFilter(newFilter: JobFilter) {
         filter.value = newFilter
@@ -54,19 +44,7 @@ class JobListViewModel @Inject constructor(
         selectedTab.value = tab
     }
 
-    fun refresh() {
-        viewModelScope.launch {
-            isLoading.value = true
-            repository.refreshJobs()
-                .onSuccess { errorMessage.value = null }
-                .onFailure { errorMessage.value = it.message ?: "Failed to load jobs" }
-            isLoading.value = false
-        }
-    }
-
     fun deleteJob(id: Long) {
-        viewModelScope.launch {
-            repository.deleteJob(id).onFailure { errorMessage.value = it.message ?: "Failed to delete job" }
-        }
+        viewModelScope.launch { repository.deleteJob(id) }
     }
 }

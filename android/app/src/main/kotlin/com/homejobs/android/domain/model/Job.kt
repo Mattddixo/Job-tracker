@@ -21,8 +21,8 @@ data class Job(
     val warrantyExpiry: String?,
     val paymentStatus: PaymentStatus,
     val paymentMethod: String?,
-    val createdAt: String,
-    val updatedAt: String,
+    val createdAt: Long,
+    val updatedAt: Long,
 ) {
     val costVariance: Double?
         get() = if (actualCost != null && quotedCost != null) actualCost - quotedCost else null

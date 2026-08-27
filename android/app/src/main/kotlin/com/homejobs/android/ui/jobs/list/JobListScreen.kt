@@ -7,17 +7,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -33,32 +32,22 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.homejobs.android.domain.model.Job
 import com.homejobs.android.domain.model.JobFilter
+import com.homejobs.android.domain.model.JobSortField
 import com.homejobs.android.domain.model.SortDirection
 import com.homejobs.android.ui.common.EmptyState
-import com.homejobs.android.ui.common.ErrorState
-import com.homejobs.android.ui.common.LoadingState
+import com.homejobs.android.ui.common.EnumDropdown
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JobListScreen(
     onJobClick: (Long) -> Unit,
     onAddJobClick: () -> Unit,
-    onSettingsClick: () -> Unit,
     viewModel: JobListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Home Jobs") },
-                actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                    }
-                },
-            )
-        },
+        topBar = { TopAppBar(title = { Text("Home Jobs") }) },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddJobClick) {
                 Icon(Icons.Filled.Add, contentDescription = "Add job")
@@ -76,12 +65,10 @@ fun JobListScreen(
                 }
             }
             SortBar(filter = uiState.filter, onFilterChange = viewModel::updateFilter)
-            when {
-                uiState.isLoading && uiState.jobs.isEmpty() -> LoadingState()
-                uiState.errorMessage != null && uiState.jobs.isEmpty() ->
-                    ErrorState(message = uiState.errorMessage!!, onRetry = viewModel::refresh)
-                uiState.jobs.isEmpty() -> EmptyState(emptyMessage(uiState.selectedTab))
-                else -> JobList(jobs = uiState.jobs, onJobClick = onJobClick)
+            if (uiState.jobs.isEmpty()) {
+                EmptyState(emptyMessage(uiState.selectedTab))
+            } else {
+                JobList(jobs = uiState.jobs, onJobClick = onJobClick)
             }
         }
     }
@@ -131,7 +118,6 @@ private fun JobRow(job: Job, onClick: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SortBar(filter: JobFilter, onFilterChange: (JobFilter) -> Unit) {
     Row(
@@ -140,6 +126,14 @@ private fun SortBar(filter: JobFilter, onFilterChange: (JobFilter) -> Unit) {
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        EnumDropdown(
+            label = "Sort by",
+            options = JobSortField.entries,
+            selected = filter.sortBy,
+            optionLabel = ::sortFieldLabel,
+            onSelected = { field -> onFilterChange(filter.copy(sortBy = field)) },
+            modifier = Modifier.weight(1f),
+        )
         FilterChip(
             selected = filter.sortDir == SortDirection.ASC,
             onClick = {
@@ -147,7 +141,17 @@ private fun SortBar(filter: JobFilter, onFilterChange: (JobFilter) -> Unit) {
                     filter.copy(sortDir = if (filter.sortDir == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC),
                 )
             },
-            label = { Text(if (filter.sortDir == SortDirection.ASC) "Oldest first" else "Newest first") },
+            label = { Text(if (filter.sortDir == SortDirection.ASC) "Ascending" else "Descending") },
         )
     }
+}
+
+private fun sortFieldLabel(field: JobSortField): String = when (field) {
+    JobSortField.CREATED_AT -> "Date added"
+    JobSortField.UPDATED_AT -> "Last updated"
+    JobSortField.SCHEDULED_DATE -> "Scheduled date"
+    JobSortField.COMPLETED_DATE -> "Completed date"
+    JobSortField.COST_VARIANCE -> "Cost variance"
+    JobSortField.TIME_VARIANCE -> "Time variance"
+    JobSortField.TITLE -> "Title"
 }

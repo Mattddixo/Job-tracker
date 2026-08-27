@@ -10,7 +10,6 @@ import androidx.navigation.navArgument
 import com.homejobs.android.ui.jobs.detail.JobDetailScreen
 import com.homejobs.android.ui.jobs.form.JobFormScreen
 import com.homejobs.android.ui.jobs.list.JobListScreen
-import com.homejobs.android.ui.settings.SettingsScreen
 
 @Composable
 fun HomeJobsNavGraph(navController: NavHostController = rememberNavController()) {
@@ -19,7 +18,6 @@ fun HomeJobsNavGraph(navController: NavHostController = rememberNavController())
             JobListScreen(
                 onJobClick = { id -> navController.navigate(Routes.jobDetail(id)) },
                 onAddJobClick = { navController.navigate(Routes.jobFormCreate()) },
-                onSettingsClick = { navController.navigate(Routes.SETTINGS) },
             )
         }
         composable(
@@ -39,9 +37,6 @@ fun HomeJobsNavGraph(navController: NavHostController = rememberNavController())
                 onBack = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() },
             )
-        }
-        composable(Routes.SETTINGS) {
-            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

@@ -2,24 +2,30 @@ package com.homejobs.android.data.repository
 
 import com.homejobs.android.data.local.db.JobDao
 import com.homejobs.android.data.local.db.JobNoteDao
-import com.homejobs.android.data.remote.HomeJobsApiService
+import com.homejobs.android.data.local.db.JobNoteEntity
+import com.homejobs.android.data.local.db.PhotoDao
+import com.homejobs.android.data.local.db.PhotoEntity
+import com.homejobs.android.data.local.photo.PhotoStorage
 import com.homejobs.android.domain.model.Job
 import com.homejobs.android.domain.model.JobFilter
 import com.homejobs.android.domain.model.JobNote
 import com.homejobs.android.domain.model.JobSortField
 import com.homejobs.android.domain.model.JobUpsertInput
+import com.homejobs.android.domain.model.Photo
 import com.homejobs.android.domain.model.SortDirection
 import com.homejobs.android.domain.repository.JobRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class JobRepositoryImpl @Inject constructor(
-    private val api: HomeJobsApiService,
     private val jobDao: JobDao,
     private val jobNoteDao: JobNoteDao,
+    private val photoDao: PhotoDao,
+    private val photoStorage: PhotoStorage,
 ) : JobRepository {
 
     override fun observeJobs(filter: JobFilter): Flow<List<Job>> =
@@ -32,49 +38,53 @@ class JobRepositoryImpl @Inject constructor(
     override fun observeJob(id: Long): Flow<Job?> = jobDao.observeJob(id).map { it?.toDomain() }
 
     override fun observeNotes(jobId: Long): Flow<List<JobNote>> =
-        jobNoteDao.observeNotes(jobId).map { entities -> entities.map { it.toDomain() } }
+        jobNoteDao.observeNotesWithPhotos(jobId).map { notes -> notes.map { it.toDomain() } }
 
-    override suspend fun refreshJobs(): Result<Unit> = runCatching {
-        val jobs = api.listJobs()
-        jobDao.replaceAll(jobs.map { it.toEntity() })
+    override suspend fun createJob(input: JobUpsertInput): Job {
+        val now = System.currentTimeMillis()
+        val entity = input.toEntity(createdAt = now, updatedAt = now)
+        val id = jobDao.insert(entity)
+        return entity.copy(id = id).toDomain()
     }
 
-    override suspend fun refreshJob(id: Long): Result<Unit> = runCatching {
-        val job = api.getJob(id)
-        jobDao.upsert(job.toEntity())
+    override suspend fun updateJob(id: Long, input: JobUpsertInput): Job {
+        val existing = jobDao.observeJob(id).first()
+        val createdAt = existing?.createdAt ?: System.currentTimeMillis()
+        val entity = input.toEntity(id = id, createdAt = createdAt, updatedAt = System.currentTimeMillis())
+        jobDao.update(entity)
+        return entity.toDomain()
     }
 
-    override suspend fun refreshNotes(jobId: Long): Result<Unit> = runCatching {
-        val notes = api.listNotes(jobId)
-        jobNoteDao.replaceForJob(jobId, notes.map { it.toEntity() })
-    }
-
-    override suspend fun createJob(input: JobUpsertInput): Result<Job> = runCatching {
-        val created = api.createJob(input.toRequestDto())
-        jobDao.upsert(created.toEntity())
-        created.toEntity().toDomain()
-    }
-
-    override suspend fun updateJob(id: Long, input: JobUpsertInput): Result<Job> = runCatching {
-        val updated = api.updateJob(id, input.toRequestDto())
-        jobDao.upsert(updated.toEntity())
-        updated.toEntity().toDomain()
-    }
-
-    override suspend fun deleteJob(id: Long): Result<Unit> = runCatching {
-        api.deleteJob(id)
+    override suspend fun deleteJob(id: Long) {
+        val photoPaths = photoDao.filePathsForJob(id)
         jobDao.delete(id)
+        photoPaths.forEach { photoStorage.deleteFile(it) }
     }
 
-    override suspend fun addNote(jobId: Long, body: String): Result<JobNote> = runCatching {
-        val created = api.addNote(jobId, body.toNoteRequestDto())
-        jobNoteDao.upsert(created.toEntity())
-        created.toEntity().toDomain()
+    override suspend fun addNote(jobId: Long, body: String, photoPaths: List<String>): JobNote {
+        val now = System.currentTimeMillis()
+        val noteId = jobNoteDao.insert(JobNoteEntity(jobId = jobId, timestamp = now, body = body))
+        val photos = photoPaths.map { path ->
+            val photoId = photoDao.insert(PhotoEntity(noteId = noteId, filePath = path, createdAt = now))
+            Photo(id = photoId, noteId = noteId, filePath = path, createdAt = now)
+        }
+        return JobNote(id = noteId, jobId = jobId, timestamp = now, body = body, photos = photos)
     }
 
-    override suspend fun deleteNote(jobId: Long, noteId: Long): Result<Unit> = runCatching {
-        api.deleteNote(jobId, noteId)
+    override suspend fun deleteNote(jobId: Long, noteId: Long) {
+        val photoPaths = photoDao.filePathsForNote(noteId)
         jobNoteDao.delete(noteId)
+        photoPaths.forEach { photoStorage.deleteFile(it) }
+    }
+
+    override suspend fun addPhotoToNote(noteId: Long, filePath: String) {
+        photoDao.insert(PhotoEntity(noteId = noteId, filePath = filePath, createdAt = System.currentTimeMillis()))
+    }
+
+    override suspend fun deletePhoto(photoId: Long) {
+        val photo = photoDao.getById(photoId) ?: return
+        photoDao.delete(photoId)
+        photoStorage.deleteFile(photo.filePath)
     }
 
     private fun comparator(filter: JobFilter): Comparator<Job> {

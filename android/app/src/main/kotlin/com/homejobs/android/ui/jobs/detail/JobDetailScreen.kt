@@ -1,20 +1,33 @@
 package com.homejobs.android.ui.jobs.detail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,18 +38,31 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import com.homejobs.android.data.local.photo.PhotoStorage
 import com.homejobs.android.domain.model.Job
 import com.homejobs.android.domain.model.JobNote
+import com.homejobs.android.domain.model.Photo
 import com.homejobs.android.ui.common.ErrorState
 import com.homejobs.android.ui.common.LoadingState
 import com.homejobs.android.ui.common.UiState
 import com.homejobs.android.ui.common.toDisplayDate
 import com.homejobs.android.ui.common.toDisplayDateTime
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,16 +99,20 @@ fun JobDetailScreen(
         when (val jobState = uiState.job) {
             is UiState.Loading -> LoadingState(modifier = Modifier.padding(padding))
             is UiState.Empty -> ErrorState("Job not found.", modifier = Modifier.padding(padding))
-            is UiState.Error -> ErrorState(jobState.message, onRetry = viewModel::refresh, modifier = Modifier.padding(padding))
+            is UiState.Error -> ErrorState(jobState.message, modifier = Modifier.padding(padding))
             is UiState.Success -> JobDetailContent(
                 job = jobState.data,
                 notes = uiState.notes,
                 noteDraft = uiState.noteDraft,
+                pendingPhotoPaths = uiState.pendingPhotoPaths,
                 isSubmittingNote = uiState.isSubmittingNote,
                 noteError = uiState.noteError,
                 onNoteDraftChange = viewModel::updateNoteDraft,
+                onPhotoAdded = viewModel::addPendingPhoto,
+                onPendingPhotoRemoved = viewModel::removePendingPhoto,
                 onSubmitNote = viewModel::submitNote,
                 onDeleteNote = viewModel::deleteNote,
+                onDeletePhoto = viewModel::deletePhoto,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -94,28 +124,35 @@ private fun JobDetailContent(
     job: Job,
     notes: List<JobNote>,
     noteDraft: String,
+    pendingPhotoPaths: List<String>,
     isSubmittingNote: Boolean,
     noteError: String?,
     onNoteDraftChange: (String) -> Unit,
+    onPhotoAdded: (String) -> Unit,
+    onPendingPhotoRemoved: (String) -> Unit,
     onSubmitNote: () -> Unit,
     onDeleteNote: (Long) -> Unit,
+    onDeletePhoto: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var viewingPhoto by remember { mutableStateOf<String?>(null) }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { JobSummaryCard(job) }
+        item { Text("Timeline", style = MaterialTheme.typography.titleMedium) }
         item {
-            Text("Timeline", style = MaterialTheme.typography.titleMedium)
-        }
-        item {
-            AddNoteRow(
+            AddNoteCard(
                 draft = noteDraft,
+                pendingPhotoPaths = pendingPhotoPaths,
                 isSubmitting = isSubmittingNote,
                 error = noteError,
                 onDraftChange = onNoteDraftChange,
+                onPhotoAdded = onPhotoAdded,
+                onPendingPhotoRemoved = onPendingPhotoRemoved,
                 onSubmit = onSubmitNote,
             )
         }
@@ -123,8 +160,17 @@ private fun JobDetailContent(
             item { Text("No notes yet.", style = MaterialTheme.typography.bodyMedium) }
         }
         items(notes, key = { it.id }) { note ->
-            NoteRow(note = note, onDelete = { onDeleteNote(note.id) })
+            NoteRow(
+                note = note,
+                onDelete = { onDeleteNote(note.id) },
+                onDeletePhoto = onDeletePhoto,
+                onPhotoClick = { path -> viewingPhoto = path },
+            )
         }
+    }
+
+    viewingPhoto?.let { path ->
+        PhotoViewerDialog(filePath = path, onDismiss = { viewingPhoto = null })
     }
 }
 
@@ -164,45 +210,154 @@ private fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-private fun AddNoteRow(
+private fun AddNoteCard(
     draft: String,
+    pendingPhotoPaths: List<String>,
     isSubmitting: Boolean,
     error: String?,
     onDraftChange: (String) -> Unit,
+    onPhotoAdded: (String) -> Unit,
+    onPendingPhotoRemoved: (String) -> Unit,
     onSubmit: () -> Unit,
 ) {
-    Column {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    val context = LocalContext.current
+    val photoStorage = remember { PhotoStorage(context.applicationContext) }
+    var pendingCapturePath by remember { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val path = pendingCapturePath
+        if (success && path != null) onPhotoAdded(path)
+        pendingCapturePath = null
+    }
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) onPhotoAdded(photoStorage.copyToAppStorage(uri))
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = draft,
                 onValueChange = onDraftChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 label = { Text("Add a note") },
                 enabled = !isSubmitting,
             )
-            TextButton(onClick = onSubmit, enabled = !isSubmitting && draft.isNotBlank()) {
-                Text("Add")
+
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = {
+                    val target = photoStorage.createCaptureTarget()
+                    pendingCapturePath = target.filePath
+                    cameraLauncher.launch(target.uri)
+                }) {
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = "Take photo")
+                }
+                IconButton(onClick = {
+                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) {
+                    Icon(Icons.Filled.PhotoLibrary, contentDescription = "Choose photo from gallery")
+                }
+                TextButton(
+                    onClick = onSubmit,
+                    enabled = !isSubmitting && (draft.isNotBlank() || pendingPhotoPaths.isNotEmpty()),
+                ) {
+                    Text("Add")
+                }
             }
+
+            if (pendingPhotoPaths.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(pendingPhotoPaths, key = { it }) { path ->
+                        RemovableThumbnail(filePath = path, onRemove = { onPendingPhotoRemoved(path) })
+                    }
+                }
+            }
+
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
 @Composable
-private fun NoteRow(note: JobNote, onDelete: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.Top,
+private fun RemovableThumbnail(filePath: String, onRemove: () -> Unit) {
+    Box(modifier = Modifier.size(72.dp)) {
+        AsyncImage(
+            model = File(filePath),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier.align(Alignment.TopEnd).size(20.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(note.timestamp.toDisplayDateTime(), style = MaterialTheme.typography.labelSmall)
-                Text(note.body, style = MaterialTheme.typography.bodyMedium)
+            Icon(Icons.Filled.Close, contentDescription = "Remove photo", tint = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun NoteRow(
+    note: JobNote,
+    onDelete: () -> Unit,
+    onDeletePhoto: (Long) -> Unit,
+    onPhotoClick: (String) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(note.timestamp.toDisplayDateTime(), style = MaterialTheme.typography.labelSmall)
+                    if (note.body.isNotBlank()) {
+                        Text(note.body, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete note")
+                }
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete note")
+            if (note.photos.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(note.photos, key = { it.id }) { photo: Photo ->
+                        Box(modifier = Modifier.size(80.dp)) {
+                            AsyncImage(
+                                model = File(photo.filePath),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { onPhotoClick(photo.filePath) },
+                            )
+                            IconButton(
+                                onClick = { onDeletePhoto(photo.id) },
+                                modifier = Modifier.align(Alignment.TopEnd).size(20.dp),
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = "Remove photo", tint = Color.White)
+                            }
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun PhotoViewerDialog(filePath: String, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(modifier = Modifier.wrapContentSize()) {
+            AsyncImage(
+                model = File(filePath),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onDismiss() },
+            )
         }
     }
 }
