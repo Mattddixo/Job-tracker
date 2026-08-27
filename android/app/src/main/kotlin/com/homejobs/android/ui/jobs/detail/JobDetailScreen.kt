@@ -35,6 +35,8 @@ import com.homejobs.android.domain.model.JobNote
 import com.homejobs.android.ui.common.ErrorState
 import com.homejobs.android.ui.common.LoadingState
 import com.homejobs.android.ui.common.UiState
+import com.homejobs.android.ui.common.toDisplayDate
+import com.homejobs.android.ui.common.toDisplayDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,9 +146,9 @@ private fun JobSummaryCard(job: Job) {
             InfoRow("Actual hours", job.actualHours?.toString() ?: "—")
             InfoRow("Time variance", job.timeVariance?.toString() ?: "—")
             HorizontalDivider()
-            job.scheduledDate?.let { InfoRow("Scheduled", it) }
-            job.completedDate?.let { InfoRow("Completed", it) }
-            job.warrantyExpiry?.let { InfoRow("Warranty until", it) }
+            job.scheduledDate?.let { InfoRow("Scheduled", it.toDisplayDate()) }
+            job.completedDate?.let { InfoRow("Completed", it.toDisplayDate()) }
+            job.warrantyExpiry?.let { InfoRow("Warranty until", it.toDisplayDate()) }
             InfoRow("Payment status", job.paymentStatus.name)
             job.paymentMethod?.let { InfoRow("Payment method", it) }
         }
@@ -195,7 +197,7 @@ private fun NoteRow(note: JobNote, onDelete: () -> Unit) {
             verticalAlignment = androidx.compose.ui.Alignment.Top,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(note.timestamp, style = MaterialTheme.typography.labelSmall)
+                Text(note.timestamp.toDisplayDateTime(), style = MaterialTheme.typography.labelSmall)
                 Text(note.body, style = MaterialTheme.typography.bodyMedium)
             }
             IconButton(onClick = onDelete) {

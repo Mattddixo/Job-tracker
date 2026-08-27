@@ -1,15 +1,21 @@
 package com.homejobs.android.ui.jobs.form
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,19 +27,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.homejobs.android.domain.model.JobStatus
 import com.homejobs.android.domain.model.PaymentStatus
 import com.homejobs.android.ui.common.LoadingState
+import com.homejobs.android.ui.common.toDisplayDate
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,47 +123,41 @@ fun JobFormScreen(
                 onSelected = { status -> viewModel.updateInput { it.copy(status = status) } },
             )
 
-            OutlinedTextField(
-                value = input.quotedCost?.toString().orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(quotedCost = text.toDoubleOrNull()) } },
-                label = { Text("Quoted cost") },
-                modifier = Modifier.fillMaxWidth(),
+            NumberField(
+                label = "Quoted cost ($)",
+                initialValue = input.quotedCost,
+                onValueChange = { value -> viewModel.updateInput { it.copy(quotedCost = value) } },
             )
-            OutlinedTextField(
-                value = input.actualCost?.toString().orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(actualCost = text.toDoubleOrNull()) } },
-                label = { Text("Actual cost") },
-                modifier = Modifier.fillMaxWidth(),
+            NumberField(
+                label = "Actual cost ($)",
+                initialValue = input.actualCost,
+                onValueChange = { value -> viewModel.updateInput { it.copy(actualCost = value) } },
             )
-            OutlinedTextField(
-                value = input.predictedHours?.toString().orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(predictedHours = text.toDoubleOrNull()) } },
-                label = { Text("Predicted hours") },
-                modifier = Modifier.fillMaxWidth(),
+            NumberField(
+                label = "Predicted hours",
+                initialValue = input.predictedHours,
+                onValueChange = { value -> viewModel.updateInput { it.copy(predictedHours = value) } },
             )
-            OutlinedTextField(
-                value = input.actualHours?.toString().orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(actualHours = text.toDoubleOrNull()) } },
-                label = { Text("Actual hours") },
-                modifier = Modifier.fillMaxWidth(),
+            NumberField(
+                label = "Actual hours",
+                initialValue = input.actualHours,
+                onValueChange = { value -> viewModel.updateInput { it.copy(actualHours = value) } },
             )
-            OutlinedTextField(
-                value = input.scheduledDate.orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(scheduledDate = text.ifBlank { null }) } },
-                label = { Text("Scheduled date (YYYY-MM-DD)") },
-                modifier = Modifier.fillMaxWidth(),
+
+            DateField(
+                label = "Scheduled date",
+                value = input.scheduledDate,
+                onValueChange = { date -> viewModel.updateInput { it.copy(scheduledDate = date) } },
             )
-            OutlinedTextField(
-                value = input.completedDate.orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(completedDate = text.ifBlank { null }) } },
-                label = { Text("Completed date (YYYY-MM-DD)") },
-                modifier = Modifier.fillMaxWidth(),
+            DateField(
+                label = "Completed date",
+                value = input.completedDate,
+                onValueChange = { date -> viewModel.updateInput { it.copy(completedDate = date) } },
             )
-            OutlinedTextField(
-                value = input.warrantyExpiry.orEmpty(),
-                onValueChange = { text -> viewModel.updateInput { it.copy(warrantyExpiry = text.ifBlank { null }) } },
-                label = { Text("Warranty expiry (YYYY-MM-DD)") },
-                modifier = Modifier.fillMaxWidth(),
+            DateField(
+                label = "Warranty expiry",
+                value = input.warrantyExpiry,
+                onValueChange = { date -> viewModel.updateInput { it.copy(warrantyExpiry = date) } },
             )
 
             EnumDropdown(
@@ -185,6 +192,97 @@ fun JobFormScreen(
             ) {
                 Text(if (uiState.isSaving) "Saving…" else "Save")
             }
+        }
+    }
+}
+
+/**
+ * Keeps its own text buffer rather than deriving the displayed text from [initialValue] on every
+ * recomposition: re-deriving from the parsed Double (e.g. `1.0.toString()`) would rewrite "1" to
+ * "1.0" mid-keystroke and make it impossible to type something like "12.5". The buffer is seeded
+ * once, when the field first enters composition (which — because the form shows a loading state
+ * until any existing job data has arrived — already has the right value in both create and edit
+ * mode).
+ */
+@Composable
+private fun NumberField(
+    label: String,
+    initialValue: Double?,
+    onValueChange: (Double?) -> Unit,
+) {
+    var text by remember { mutableStateOf(initialValue?.toInputString().orEmpty()) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { newText ->
+            if (newText.matches(Regex("^\\d*\\.?\\d*$"))) {
+                text = newText
+                onValueChange(newText.toDoubleOrNull())
+            }
+        },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+private fun Double.toInputString(): String =
+    if (this == Math.floor(this) && !this.isInfinite()) toLong().toString() else toString()
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateField(
+    label: String,
+    value: String?,
+    onValueChange: (String?) -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+
+    OutlinedTextField(
+        value = value?.toDisplayDate().orEmpty(),
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        placeholder = { Text("Not set") },
+        trailingIcon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showPicker = true },
+    )
+
+    if (showPicker) {
+        val initialMillis = value?.let {
+            LocalDate.parse(it).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        }
+        // DatePicker works in UTC millis; encoding/decoding with ZoneOffset.UTC on both ends
+        // avoids the classic off-by-one-day bug from mixing in the device's local zone.
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                Row {
+                    if (value != null) {
+                        TextButton(onClick = {
+                            onValueChange(null)
+                            showPicker = false
+                        }) { Text("Clear") }
+                    }
+                    TextButton(onClick = {
+                        val millis = datePickerState.selectedDateMillis
+                        onValueChange(
+                            millis?.let {
+                                Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                            },
+                        )
+                        showPicker = false
+                    }) { Text("OK") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) { Text("Cancel") }
+            },
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

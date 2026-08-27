@@ -22,16 +22,24 @@ class JobListViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val filter = MutableStateFlow(JobFilter())
+    private val selectedTab = MutableStateFlow(JobListTab.ACTIVE)
     private val isLoading = MutableStateFlow(true)
     private val errorMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<JobListUiState> = combine(
         filter.flatMapLatest { repository.observeJobs(it) },
         filter,
+        selectedTab,
         isLoading,
         errorMessage,
-    ) { jobs, currentFilter, loading, error ->
-        JobListUiState(jobs = jobs, filter = currentFilter, isLoading = loading, errorMessage = error)
+    ) { jobs, currentFilter, tab, loading, error ->
+        JobListUiState(
+            jobs = jobs.filter { tab.matches(it.status) },
+            filter = currentFilter,
+            selectedTab = tab,
+            isLoading = loading,
+            errorMessage = error,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JobListUiState())
 
     init {
@@ -40,6 +48,10 @@ class JobListViewModel @Inject constructor(
 
     fun updateFilter(newFilter: JobFilter) {
         filter.value = newFilter
+    }
+
+    fun selectTab(tab: JobListTab) {
+        selectedTab.value = tab
     }
 
     fun refresh() {

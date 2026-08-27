@@ -64,6 +64,21 @@ app/src/test/kotlin/com/homejobs/android/
   as an `ORDER BY` parameter, and a household's job list is never going to be large enough for
   that to matter — `JobRepositoryImpl` fetches the filtered rows and applies a `Comparator` in
   Kotlin.
+- **Active/Completed/All is a UI-level grouping, not a repository filter.** `JobListTab` (in
+  `ui/jobs/list`) buckets by status purely in `JobListViewModel`, on top of whatever
+  `observeJobs(filter)` already returned — same "small dataset, do it in memory" reasoning as
+  sorting above. The job list defaults to the Active tab so a growing pile of finished jobs
+  doesn't bury what's still open; Completed and All are one tap away.
+- **Job-form number fields keep their own text buffer.** Deriving the displayed text from the
+  parsed `Double` on every recomposition (e.g. `1.0.toString()`) would rewrite "1" to "1.0"
+  mid-keystroke, making it impossible to type "12.5". `NumberField` seeds a local `String` once
+  (the form already blocks on a loading state until any existing job data has arrived, so the
+  seed value is correct in both create and edit mode) and only pushes the parsed value up to the
+  ViewModel; the field never re-derives its text from that value.
+- **Date fields use a real `DatePicker`, not typed text.** Free-text "YYYY-MM-DD" entry invites
+  malformed dates for no benefit; `DateField` opens a Material3 date picker and stores/round-trips
+  through UTC-midnight epoch millis (the convention `DatePicker` itself uses) to avoid the classic
+  off-by-one-day bug from mixing in the device's local time zone.
 - **Dynamic base URL.** Retrofit is built once against a placeholder base URL;
   `DynamicBaseUrlInterceptor` rewrites the scheme/host/port (and preserves any reverse-proxy path
   prefix from the configured server URL) and attaches the bearer token on every request, reading
@@ -126,6 +141,8 @@ no emulator, no Android SDK at test-run time. Covered:
   stale cached data, server-side deletions are reflected on the next refresh, create/delete/notes
   round-trip through the fake API and cache.
 - `JobListViewModelTest` — initial refresh, refresh-failure error surfacing, status filtering,
-  delete delegation.
+  Active/Completed/All tab grouping, delete delegation.
 - `JobFormViewModelTest` — validation blocks save on bad input, valid input creates a job and
   fires the callback, editing pre-populates the form from the repository.
+- `DateFormattingTest` — date/date-time display formatting, including that fractional seconds
+  and the raw ISO separators never leak into what's shown.

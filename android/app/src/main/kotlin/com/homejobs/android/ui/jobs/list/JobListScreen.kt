@@ -2,6 +2,7 @@ package com.homejobs.android.ui.jobs.list
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -29,8 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.homejobs.android.domain.model.Job
-import com.homejobs.android.domain.model.JobSortField
-import com.homejobs.android.domain.model.JobStatus
+import com.homejobs.android.domain.model.JobFilter
 import com.homejobs.android.domain.model.SortDirection
 import com.homejobs.android.ui.common.EmptyState
 import com.homejobs.android.ui.common.ErrorState
@@ -64,26 +66,38 @@ fun JobListScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            FilterBar(
-                filter = uiState.filter,
-                onFilterChange = viewModel::updateFilter,
-            )
+            TabRow(selectedTabIndex = uiState.selectedTab.ordinal) {
+                JobListTab.entries.forEach { tab ->
+                    Tab(
+                        selected = uiState.selectedTab == tab,
+                        onClick = { viewModel.selectTab(tab) },
+                        text = { Text(tab.label) },
+                    )
+                }
+            }
+            SortBar(filter = uiState.filter, onFilterChange = viewModel::updateFilter)
             when {
                 uiState.isLoading && uiState.jobs.isEmpty() -> LoadingState()
                 uiState.errorMessage != null && uiState.jobs.isEmpty() ->
                     ErrorState(message = uiState.errorMessage!!, onRetry = viewModel::refresh)
-                uiState.jobs.isEmpty() -> EmptyState("No jobs yet. Tap + to add one.")
+                uiState.jobs.isEmpty() -> EmptyState(emptyMessage(uiState.selectedTab))
                 else -> JobList(jobs = uiState.jobs, onJobClick = onJobClick)
             }
         }
     }
 }
 
+private fun emptyMessage(tab: JobListTab): String = when (tab) {
+    JobListTab.ACTIVE -> "No active jobs. Tap + to add one."
+    JobListTab.COMPLETED -> "No completed jobs yet."
+    JobListTab.ALL -> "No jobs yet. Tap + to add one."
+}
+
 @Composable
 private fun JobList(jobs: List<Job>, onJobClick: (Long) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(jobs, key = { it.id }) { job ->
@@ -119,22 +133,13 @@ private fun JobRow(job: Job, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FilterBar(filter: com.homejobs.android.domain.model.JobFilter, onFilterChange: (com.homejobs.android.domain.model.JobFilter) -> Unit) {
+private fun SortBar(filter: JobFilter, onFilterChange: (JobFilter) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        JobStatus.entries.forEach { status ->
-            FilterChip(
-                selected = filter.status == status,
-                onClick = {
-                    onFilterChange(filter.copy(status = if (filter.status == status) null else status))
-                },
-                label = { Text(status.name.replace('_', ' ')) },
-            )
-        }
         FilterChip(
             selected = filter.sortDir == SortDirection.ASC,
             onClick = {
