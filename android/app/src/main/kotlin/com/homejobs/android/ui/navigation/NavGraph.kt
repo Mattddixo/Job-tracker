@@ -13,7 +13,7 @@ import com.homejobs.android.ui.jobs.detail.JobDetailScreen
 import com.homejobs.android.ui.jobs.form.JobFormScreen
 import com.homejobs.android.ui.jobs.list.JobListScreen
 import com.homejobs.android.ui.jobs.photos.JobPhotosScreen
-import com.homejobs.android.ui.theme.ColorPalette
+import com.homejobs.android.ui.theme.CustomColors
 import com.homejobs.android.ui.theme.ThemeMode
 
 @Composable
@@ -21,8 +21,8 @@ fun HomeJobsNavGraph(
     navController: NavHostController = rememberNavController(),
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
-    colorPalette: ColorPalette,
-    onColorPaletteChange: (ColorPalette) -> Unit,
+    customColors: CustomColors,
+    onCustomColorsChange: (CustomColors) -> Unit,
 ) {
     NavHost(navController = navController, startDestination = Routes.JOB_LIST) {
         composable(Routes.JOB_LIST) {
@@ -78,8 +78,8 @@ fun HomeJobsNavGraph(
                 onBack = { navController.popBackStack() },
                 themeMode = themeMode,
                 onThemeModeChange = onThemeModeChange,
-                colorPalette = colorPalette,
-                onColorPaletteChange = onColorPaletteChange,
+                customColors = customColors,
+                onCustomColorsChange = onCustomColorsChange,
             )
         }
     }

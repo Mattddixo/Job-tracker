@@ -13,7 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.SettingsBrightness
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -135,7 +135,7 @@ private fun AppearanceAction(themeMode: ThemeMode, onClick: () -> Unit) {
     val icon = when (themeMode) {
         ThemeMode.LIGHT -> Icons.Filled.LightMode
         ThemeMode.DARK -> Icons.Filled.DarkMode
-        ThemeMode.SYSTEM -> Icons.Filled.SettingsBrightness
+        ThemeMode.CUSTOM -> Icons.Filled.Palette
     }
     IconButton(onClick = onClick) {
         Icon(icon, contentDescription = "Appearance")

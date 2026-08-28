@@ -1,6 +1,8 @@
 package com.homejobs.android.ui.appearance
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -26,19 +25,28 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.homejobs.android.ui.theme.ColorPalette
+import com.homejobs.android.ui.theme.CustomColors
 import com.homejobs.android.ui.theme.ThemeMode
-import com.homejobs.android.ui.theme.lightAccents
+
+private enum class ColorRole(val label: String) {
+    PRIMARY("Primary"),
+    SECONDARY("Secondary"),
+    ACCENT("Accent"),
+}
 
 /**
- * A relaxed, browsable settings screen: a Light/Dark/System toggle, and a small gallery of
- * hand-picked color palettes you can tap through — each applies everywhere immediately, so
- * finding one you like is just a matter of looking.
+ * A relaxed, browsable settings screen: a Light/Dark/Custom toggle, and — only when Custom is
+ * selected — three color swatches you pick from a color wheel. Every change applies immediately
+ * everywhere else in the app, so there's nothing to "save".
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,9 +54,11 @@ fun AppearanceScreen(
     onBack: () -> Unit,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
-    colorPalette: ColorPalette,
-    onColorPaletteChange: (ColorPalette) -> Unit,
+    customColors: CustomColors,
+    onCustomColorsChange: (CustomColors) -> Unit,
 ) {
+    var editingRole by remember { mutableStateOf(ColorRole.PRIMARY) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -67,7 +77,7 @@ fun AppearanceScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Theme", style = MaterialTheme.typography.titleMedium)
@@ -82,60 +92,62 @@ fun AppearanceScreen(
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Color palette", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Pick whichever feels right — it applies everywhere right away.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ColorPalette.entries.forEach { palette ->
-                        PaletteCard(
-                            palette = palette,
-                            selected = palette == colorPalette,
-                            onClick = { onColorPaletteChange(palette) },
-                        )
+            if (themeMode == ThemeMode.CUSTOM) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Custom colors", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Pick a swatch, then drag on the wheel to explore — it applies live.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        ColorRole.entries.forEach { role ->
+                            RoleSwatch(
+                                role = role,
+                                color = customColors.colorFor(role),
+                                selected = editingRole == role,
+                                onClick = { editingRole = role },
+                            )
+                        }
                     }
+                    ColorWheelPicker(
+                        color = customColors.colorFor(editingRole),
+                        onColorChange = { newColor -> onCustomColorsChange(customColors.with(editingRole, newColor)) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
                 }
             }
         }
     }
 }
 
-@Composable
-private fun PaletteCard(palette: ColorPalette, selected: Boolean, onClick: () -> Unit) {
-    val accents = palette.lightAccents()
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = if (selected) {
-            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        } else {
-            CardDefaults.cardColors()
-        },
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Swatch(accents.primary)
-            Swatch(accents.secondary)
-            Swatch(accents.tertiary)
-            Text(
-                text = palette.label,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f).padding(start = 4.dp),
-            )
-            if (selected) {
-                Icon(Icons.Filled.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
-            }
-        }
-    }
+private fun CustomColors.colorFor(role: ColorRole): Color = when (role) {
+    ColorRole.PRIMARY -> primary
+    ColorRole.SECONDARY -> secondary
+    ColorRole.ACCENT -> tertiary
+}
+
+private fun CustomColors.with(role: ColorRole, color: Color): CustomColors = when (role) {
+    ColorRole.PRIMARY -> copy(primary = color)
+    ColorRole.SECONDARY -> copy(secondary = color)
+    ColorRole.ACCENT -> copy(tertiary = color)
 }
 
 @Composable
-private fun Swatch(color: Color) {
-    Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(color))
+private fun RoleSwatch(role: ColorRole, color: Color, selected: Boolean, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(color)
+                .border(
+                    width = if (selected) 3.dp else 1.dp,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    shape = CircleShape,
+                )
+                .clickable(onClick = onClick),
+        ) {}
+        Text(role.label, style = MaterialTheme.typography.labelSmall)
+    }
 }
