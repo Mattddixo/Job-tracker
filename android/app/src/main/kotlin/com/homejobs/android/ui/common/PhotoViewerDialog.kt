@@ -10,8 +10,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -32,6 +35,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +50,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -65,9 +73,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private const val MIN_ZOOM = 1f
+private const val MAX_ZOOM = 5f
+
 /**
- * Full-screen, swipeable photo viewer with share/save-to-gallery actions, reused from both the
- * job detail note timeline and the job's all-photos grid.
+ * Like [androidx.compose.foundation.gestures.detectTransformGestures], but only reacts to
+ * two-finger pinch/pan — a plain one-finger drag is left completely untouched (never consumed),
+ * so it still reaches the HorizontalPager's own swipe-between-photos gesture instead of being
+ * mistaken for a pan.
+ */
+private suspend fun PointerInputScope.detectPinchToZoom(onGesture: (pan: Offset, zoom: Float) -> Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        do {
+            val event = awaitPointerEvent()
+            if (event.changes.size > 1) {
+                val zoomChange = event.calculateZoom()
+                val panChange = event.calculatePan()
+                if (zoomChange != 1f || panChange != Offset.Zero) {
+                    onGesture(panChange, zoomChange)
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        } while (event.changes.any { it.pressed })
+    }
+}
+
+/**
+ * Full-screen, swipeable, pinch-to-zoom photo viewer with share/save-to-gallery actions, reused
+ * from both the job detail note timeline and the job's all-photos grid.
  *
  * @param photos the set of photos to swipe between (a single note's photos, or every photo on
  *   the job) — [initialIndex] is where the pager opens.
@@ -92,6 +126,16 @@ fun PhotoViewerDialog(
     val pagerState = rememberPagerState(initialPage = initialIndex.coerceIn(0, photos.lastIndex)) { photos.size }
     var showCaption by remember { mutableStateOf(true) }
     var permissionRequestPending by remember { mutableStateOf(false) }
+
+    // Pinch-zoom/pan state for whichever photo is currently on screen — reset whenever the user
+    // swipes to a different one, and swiping itself is disabled while zoomed in so a pan gesture
+    // isn't fought over by the pager.
+    var zoomScale by remember { mutableStateOf(MIN_ZOOM) }
+    var zoomOffset by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(pagerState.currentPage) {
+        zoomScale = MIN_ZOOM
+        zoomOffset = Offset.Zero
+    }
 
     val currentPhoto = photos[pagerState.currentPage]
     val caption = captionFor(currentPhoto)
@@ -131,18 +175,34 @@ fun PhotoViewerDialog(
             WindowCompat.setDecorFitsSystemWindows(window, false)
         }
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = zoomScale <= MIN_ZOOM,
+            ) { page ->
                 AsyncImage(
                     model = File(photos[page].filePath),
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
+                        .graphicsLayer(
+                            scaleX = zoomScale,
+                            scaleY = zoomScale,
+                            translationX = zoomOffset.x,
+                            translationY = zoomOffset.y,
+                        )
+                        .pointerInput(page) {
+                            detectPinchToZoom { pan, zoom ->
+                                val newScale = (zoomScale * zoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                                zoomOffset = if (newScale > MIN_ZOOM) zoomOffset + pan else Offset.Zero
+                                zoomScale = newScale
+                            }
+                        },
                 )
             }
 
-            // Everything lives in one block anchored under the status bar: the action buttons,
+            // Everything lives in one panel anchored under the status bar: the action buttons,
             // then the position/date line with its hide toggle, then the caption itself. Putting
             // the info bar here — rather than at the bottom, under the gesture/navigation bar —
             // sidesteps a real gotcha: a Dialog is its own separate window, and WindowInsets for
@@ -153,12 +213,14 @@ fun PhotoViewerDialog(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                    .background(
+                        color = Color.Black.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                    )
+                    .windowInsetsPadding(WindowInsets.statusBars),
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -191,8 +253,14 @@ fun PhotoViewerDialog(
                     }
                 }
 
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    thickness = 0.5.dp,
+                    color = Color.White.copy(alpha = 0.16f),
+                )
+
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -202,8 +270,8 @@ fun PhotoViewerDialog(
                         } else {
                             currentPhoto.createdAt.toDisplayDateTime()
                         },
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -216,7 +284,8 @@ fun PhotoViewerDialog(
                             Icon(
                                 if (showCaption) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                                 contentDescription = if (showCaption) "Hide caption" else "Show caption",
-                                tint = Color.White,
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }
@@ -228,7 +297,7 @@ fun PhotoViewerDialog(
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp),
                     )
                 }
             }
