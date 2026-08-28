@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -121,9 +121,9 @@ fun PhotoViewerDialog(
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         // usePlatformDefaultWidth = false only fixes the dialog's width — its window still
-        // defaults to wrap-content height, which can leave bottom-aligned content (the caption
-        // bar) positioned past the window's actual bounds on some screens. Force true full-screen
-        // sizing and let the content draw edge-to-edge (the top/bottom bars handle insets below).
+        // defaults to wrap-content height, which can leave content positioned past the window's
+        // actual bounds on some screens. Force true full-screen sizing and let the photo draw
+        // edge-to-edge (the info bar below handles its own status-bar inset).
         val view = LocalView.current
         SideEffect {
             val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
@@ -142,60 +142,57 @@ fun PhotoViewerDialog(
                 )
             }
 
-            // Top bar: close on the left (standard exit spot), grouped actions on the right —
-            // inset for the status bar so nothing sits under it.
-            Row(
+            // Everything lives in one block anchored under the status bar: the action buttons,
+            // then the position/date line with its hide toggle, then the caption itself. Putting
+            // the info bar here — rather than at the bottom, under the gesture/navigation bar —
+            // sidesteps a real gotcha: a Dialog is its own separate window, and WindowInsets for
+            // the navigation bar are not reliably delivered into it (unlike the status bar, which
+            // came through fine), so bottom-anchored content could end up computing zero inset
+            // and land under, or flush against, the system nav bar.
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.35f))
+                    .background(Color.Black.copy(alpha = 0.45f))
                     .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(horizontal = 4.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (onOpenGrid != null) {
-                        IconButton(onClick = { onOpenGrid(currentPhoto) }) {
-                            Icon(Icons.Filled.GridView, contentDescription = "View all photos", tint = Color.White)
-                        }
-                    }
-                    IconButton(onClick = {
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "image/jpeg"
-                            putExtra(Intent.EXTRA_STREAM, photoStorage.shareUriFor(currentPhoto.filePath))
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share photo"))
-                    }) {
-                        Icon(Icons.Filled.Share, contentDescription = "Share photo", tint = Color.White)
-                    }
-                    IconButton(onClick = {
-                        val needsPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-                        if (needsPermission) permissionRequestPending = true else saveToGallery()
-                    }) {
-                        Icon(Icons.Filled.Download, contentDescription = "Save to gallery", tint = Color.White)
-                    }
-                }
-            }
-
-            // Bottom info bar: photo position + date always shown, caption (with its own
-            // hide/show toggle right beside it) only when this photo has one — inset for the
-            // gesture/navigation bar so it's never clipped by it.
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (onOpenGrid != null) {
+                            IconButton(onClick = { onOpenGrid(currentPhoto) }) {
+                                Icon(Icons.Filled.GridView, contentDescription = "View all photos", tint = Color.White)
+                            }
+                        }
+                        IconButton(onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "image/jpeg"
+                                putExtra(Intent.EXTRA_STREAM, photoStorage.shareUriFor(currentPhoto.filePath))
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share photo"))
+                        }) {
+                            Icon(Icons.Filled.Share, contentDescription = "Share photo", tint = Color.White)
+                        }
+                        IconButton(onClick = {
+                            val needsPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                            if (needsPermission) permissionRequestPending = true else saveToGallery()
+                        }) {
+                            Icon(Icons.Filled.Download, contentDescription = "Save to gallery", tint = Color.White)
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -212,7 +209,10 @@ fun PhotoViewerDialog(
                         modifier = Modifier.weight(1f),
                     )
                     if (caption.isNotBlank()) {
-                        IconButton(onClick = { showCaption = !showCaption }, modifier = Modifier.padding(start = 8.dp)) {
+                        IconButton(
+                            onClick = { showCaption = !showCaption },
+                            modifier = Modifier.size(32.dp).padding(start = 8.dp),
+                        ) {
                             Icon(
                                 if (showCaption) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                                 contentDescription = if (showCaption) "Hide caption" else "Show caption",
@@ -228,7 +228,7 @@ fun PhotoViewerDialog(
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     )
                 }
             }
