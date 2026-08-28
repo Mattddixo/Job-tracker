@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -44,8 +45,15 @@ fun ColorWheelPicker(
     var saturation by remember(color) { mutableStateOf(startHsv[1]) }
     var value by remember(color) { mutableStateOf(startHsv[2]) }
 
+    // The wheel's drag gesture (below) runs in a coroutine that's launched once and lives for
+    // as long as this Canvas does — it does NOT restart on every recomposition. Without this,
+    // it would keep calling whichever onColorChange closure existed when it first launched,
+    // which closed over a since-stale snapshot of the other two colors — so editing one color
+    // would silently revert the others back to their value from that earlier moment.
+    val currentOnColorChange = rememberUpdatedState(onColorChange)
+
     fun emit(newHue: Float = hue, newSaturation: Float = saturation, newValue: Float = value) {
-        onColorChange(Color(AndroidColor.HSVToColor(floatArrayOf(newHue, newSaturation, newValue))))
+        currentOnColorChange.value(Color(AndroidColor.HSVToColor(floatArrayOf(newHue, newSaturation, newValue))))
     }
 
     val hueRingColors = remember {
