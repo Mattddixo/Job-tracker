@@ -13,13 +13,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -43,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -84,6 +89,7 @@ fun PhotoViewerDialog(
     var permissionRequestPending by remember { mutableStateOf(false) }
 
     val currentPhoto = photos[pagerState.currentPage]
+    val caption = captionFor(currentPhoto)
 
     fun saveToGallery() {
         scope.launch {
@@ -121,71 +127,96 @@ fun PhotoViewerDialog(
                 )
             }
 
+            // Top bar: close on the left (standard exit spot), grouped actions on the right —
+            // inset for the status bar so nothing sits under it.
             Row(
-                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (onOpenGrid != null) {
-                    IconButton(onClick = { onOpenGrid(currentPhoto) }) {
-                        Icon(Icons.Filled.GridView, contentDescription = "View all photos", tint = Color.White)
-                    }
-                }
-                val caption = captionFor(currentPhoto)
-                if (caption.isNotBlank()) {
-                    IconButton(onClick = { showCaption = !showCaption }) {
-                        Icon(
-                            if (showCaption) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = if (showCaption) "Hide caption" else "Show caption",
-                            tint = Color.White,
-                        )
-                    }
-                }
-                IconButton(onClick = {
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "image/jpeg"
-                        putExtra(Intent.EXTRA_STREAM, photoStorage.shareUriFor(currentPhoto.filePath))
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    context.startActivity(Intent.createChooser(shareIntent, "Share photo"))
-                }) {
-                    Icon(Icons.Filled.Share, contentDescription = "Share photo", tint = Color.White)
-                }
-                IconButton(onClick = {
-                    val needsPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-                    if (needsPermission) permissionRequestPending = true else saveToGallery()
-                }) {
-                    Icon(Icons.Filled.Download, contentDescription = "Save to gallery", tint = Color.White)
-                }
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (onOpenGrid != null) {
+                        IconButton(onClick = { onOpenGrid(currentPhoto) }) {
+                            Icon(Icons.Filled.GridView, contentDescription = "View all photos", tint = Color.White)
+                        }
+                    }
+                    IconButton(onClick = {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/jpeg"
+                            putExtra(Intent.EXTRA_STREAM, photoStorage.shareUriFor(currentPhoto.filePath))
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share photo"))
+                    }) {
+                        Icon(Icons.Filled.Share, contentDescription = "Share photo", tint = Color.White)
+                    }
+                    IconButton(onClick = {
+                        val needsPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                        if (needsPermission) permissionRequestPending = true else saveToGallery()
+                    }) {
+                        Icon(Icons.Filled.Download, contentDescription = "Save to gallery", tint = Color.White)
+                    }
+                }
             }
 
-            val caption = captionFor(currentPhoto)
-            if (showCaption && caption.isNotBlank()) {
-                Text(
-                    text = caption,
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
-                )
-            }
-
-            Text(
-                text = "${pagerState.currentPage + 1} / ${photos.size}  ·  ${currentPhoto.createdAt.toDisplayDateTime()}",
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall,
+            // Bottom info bar: photo position + date always shown, caption (with its own
+            // hide/show toggle right beside it) only when this photo has one — inset for the
+            // gesture/navigation bar so it's never clipped by it.
+            Column(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            )
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (photos.size > 1) {
+                            "${pagerState.currentPage + 1} / ${photos.size}  ·  ${currentPhoto.createdAt.toDisplayDateTime()}"
+                        } else {
+                            currentPhoto.createdAt.toDisplayDateTime()
+                        },
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (caption.isNotBlank()) {
+                        IconButton(onClick = { showCaption = !showCaption }, modifier = Modifier.padding(start = 8.dp)) {
+                            Icon(
+                                if (showCaption) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (showCaption) "Hide caption" else "Show caption",
+                                tint = Color.White,
+                            )
+                        }
+                    }
+                }
+                if (showCaption && caption.isNotBlank()) {
+                    Text(
+                        text = caption,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
         }
     }
 }
