@@ -246,8 +246,8 @@ private fun FormSection(title: String, content: @Composable ColumnScope.() -> Un
 private fun VarianceLine(label: String, variance: Double?, format: (Double) -> String) {
     if (variance == null) return
     val color = when {
-        variance > 0 -> MaterialTheme.colorScheme.error
-        variance < 0 -> MaterialTheme.colorScheme.primary
+        variance > 0 -> MaterialTheme.colorScheme.tertiary
+        variance < 0 -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Text(

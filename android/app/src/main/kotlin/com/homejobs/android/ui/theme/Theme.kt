@@ -1,43 +1,75 @@
 package com.homejobs.android.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
 private val LightColors = lightColorScheme(
-    primary = GreenPrimary,
-    primaryContainer = GreenPrimaryContainer,
-    error = RedError,
+    primary = SlateTeal,
+    onPrimary = OnSlateTeal,
+    primaryContainer = SlateTealContainer,
+    onPrimaryContainer = OnSlateTealContainer,
+    secondary = Sage,
+    onSecondary = OnSage,
+    secondaryContainer = SageContainer,
+    onSecondaryContainer = OnSageContainer,
+    tertiary = Clay,
+    onTertiary = OnClay,
+    tertiaryContainer = ClayContainer,
+    onTertiaryContainer = OnClayContainer,
+    error = ErrorRed,
+    onError = OnErrorRed,
+    errorContainer = ErrorContainer,
+    onErrorContainer = OnErrorContainer,
+    background = PaperBackground,
+    onBackground = OnPaperBackground,
+    surface = PaperBackground,
+    onSurface = OnPaperBackground,
+    surfaceVariant = PaperSurfaceVariant,
+    onSurfaceVariant = OnPaperSurfaceVariant,
+    outline = PaperOutline,
 )
 
 private val DarkColors = darkColorScheme(
-    primary = GreenPrimaryContainer,
-    error = RedError,
+    primary = SlateTealDark,
+    onPrimary = OnSlateTealDark,
+    primaryContainer = SlateTealContainerDark,
+    onPrimaryContainer = OnSlateTealContainerDark,
+    secondary = SageDark,
+    onSecondary = OnSageDark,
+    secondaryContainer = SageContainerDark,
+    onSecondaryContainer = OnSageContainerDark,
+    tertiary = ClayDark,
+    onTertiary = OnClayDark,
+    tertiaryContainer = ClayContainerDark,
+    onTertiaryContainer = OnClayContainerDark,
+    error = ErrorRedDark,
+    onError = OnErrorRedDark,
+    errorContainer = ErrorContainerDark,
+    onErrorContainer = OnErrorContainerDark,
+    background = CharcoalBackground,
+    onBackground = OnCharcoalBackground,
+    surface = CharcoalBackground,
+    onSurface = OnCharcoalBackground,
+    surfaceVariant = CharcoalSurfaceVariant,
+    onSurfaceVariant = OnCharcoalSurfaceVariant,
+    outline = CharcoalOutline,
 )
 
+/**
+ * Always applies the hand-picked palette from Color.kt — Material You dynamic color
+ * (Android 12+ wallpaper-extracted theming) is deliberately never used, since it's what makes
+ * most Compose apps look interchangeable.
+ */
 @Composable
 fun HomeJobsTrackerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = Typography,
         content = content,
     )

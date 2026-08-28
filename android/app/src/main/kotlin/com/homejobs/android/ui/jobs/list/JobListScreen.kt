@@ -7,16 +7,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.RowScope.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -25,6 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,18 +45,26 @@ import com.homejobs.android.domain.model.JobSortField
 import com.homejobs.android.domain.model.SortDirection
 import com.homejobs.android.ui.common.EmptyState
 import com.homejobs.android.ui.common.EnumDropdown
+import com.homejobs.android.ui.theme.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JobListScreen(
     onJobClick: (Long) -> Unit,
     onAddJobClick: () -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
     viewModel: JobListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Home Jobs") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Home Jobs") },
+                actions = { ThemeModeAction(themeMode = themeMode, onThemeModeChange = onThemeModeChange) },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddJobClick) {
                 Icon(Icons.Filled.Add, contentDescription = "Add job")
@@ -112,8 +129,33 @@ private fun JobRow(job: Job, onClick: () -> Unit) {
             }
             job.costVariance?.let { variance ->
                 val label = if (variance <= 0) "Under quote by $%.2f".format(-variance) else "Over quote by $%.2f".format(variance)
-                Text(text = label, style = MaterialTheme.typography.bodySmall)
+                val color = if (variance <= 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
+                Text(text = label, style = MaterialTheme.typography.bodySmall, color = color)
             }
+        }
+    }
+}
+
+@Composable
+private fun ThemeModeAction(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val icon = when (themeMode) {
+        ThemeMode.LIGHT -> Icons.Filled.LightMode
+        ThemeMode.DARK -> Icons.Filled.DarkMode
+        ThemeMode.SYSTEM -> Icons.Filled.SettingsBrightness
+    }
+    IconButton(onClick = { menuExpanded = true }) {
+        Icon(icon, contentDescription = "Theme: ${themeMode.label}")
+    }
+    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+        ThemeMode.entries.forEach { mode ->
+            DropdownMenuItem(
+                text = { Text(mode.label) },
+                onClick = {
+                    onThemeModeChange(mode)
+                    menuExpanded = false
+                },
+            )
         }
     }
 }

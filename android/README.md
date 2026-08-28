@@ -40,7 +40,7 @@ app/src/main/kotlin/com/homejobs/android/
     jobs/detail/       job detail + notes timeline + photo capture/viewer + ViewModel
     jobs/form/         sectioned create/edit form + ViewModel
     navigation/        single-activity NavHost + routes
-    theme/             Material 3 theme
+    theme/             custom Material 3 theme (light/dark, persisted via SharedPreferences)
     common/            shared loading/empty/error composables, date formatting, EnumDropdown
 app/src/test/kotlin/com/homejobs/android/
   fakes/              hand-written fakes for JobRepository and the Room DAOs
@@ -89,6 +89,14 @@ app/src/test/kotlin/com/homejobs/android/
 - **Cost/time variance is shown live in the form itself**, not just on the detail screen —
   typing an actual cost immediately shows how far over/under quote it is, in the same
   actual-minus-quoted convention as `Job.costVariance`.
+- **The theme is a hand-picked palette, not Material You.** `ui/theme/Color.kt` defines a
+  slate-teal/sage/clay/warm-paper palette for both light and dark instead of stock Material
+  swatches; Android 12+ wallpaper-extracted dynamic color is deliberately never used (it would
+  override the custom palette and make the app look like every other default Compose app).
+  Over/under quote and over/under time also read this palette (clay for over, sage for under)
+  instead of a plain error-red/primary split. The Light/Dark/System choice is made from the
+  icon in the job list's top bar and persists across restarts via `ThemePreferences`
+  (`SharedPreferences`-backed, defaults to System).
 
 ## Running it
 
