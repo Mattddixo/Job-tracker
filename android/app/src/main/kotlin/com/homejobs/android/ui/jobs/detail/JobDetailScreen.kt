@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -68,7 +69,7 @@ import java.io.File
 fun JobDetailScreen(
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
-    onViewPhotos: (Long) -> Unit,
+    onViewPhotos: (Long, Long?) -> Unit,
     viewModel: JobDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -85,7 +86,7 @@ fun JobDetailScreen(
                 actions = {
                     val job = (uiState.job as? UiState.Success)?.data
                     if (job != null) {
-                        IconButton(onClick = { onViewPhotos(job.id) }) {
+                        IconButton(onClick = { onViewPhotos(job.id, null) }) {
                             Icon(Icons.Filled.PhotoLibrary, contentDescription = "View all photos")
                         }
                         IconButton(onClick = { onEdit(job.id) }) {
@@ -110,17 +111,29 @@ fun JobDetailScreen(
                 pendingPhotoPaths = uiState.pendingPhotoPaths,
                 isSubmittingNote = uiState.isSubmittingNote,
                 noteError = uiState.noteError,
+                editingNoteId = uiState.editingNoteId,
+                editingNoteDraft = uiState.editingNoteDraft,
+                isSavingEditedNote = uiState.isSavingEditedNote,
+                editNoteError = uiState.editNoteError,
                 onNoteDraftChange = viewModel::updateNoteDraft,
                 onPhotoAdded = viewModel::addPendingPhoto,
                 onPendingPhotoRemoved = viewModel::removePendingPhoto,
                 onSubmitNote = viewModel::submitNote,
                 onDeleteNote = viewModel::deleteNote,
                 onDeletePhoto = viewModel::deletePhoto,
+                onStartEditNote = viewModel::startEditingNote,
+                onEditDraftChange = viewModel::updateEditingNoteDraft,
+                onCancelEditNote = viewModel::cancelEditingNote,
+                onSaveEditNote = viewModel::saveEditedNote,
+                onAddPhotoToNote = viewModel::addPhotoToNote,
+                onViewPhotos = onViewPhotos,
                 modifier = Modifier.padding(padding),
             )
         }
     }
 }
+
+private data class PhotoViewerRequest(val photos: List<Photo>, val initialIndex: Int, val caption: String)
 
 @Composable
 private fun JobDetailContent(
@@ -130,15 +143,25 @@ private fun JobDetailContent(
     pendingPhotoPaths: List<String>,
     isSubmittingNote: Boolean,
     noteError: String?,
+    editingNoteId: Long?,
+    editingNoteDraft: String,
+    isSavingEditedNote: Boolean,
+    editNoteError: String?,
     onNoteDraftChange: (String) -> Unit,
     onPhotoAdded: (String) -> Unit,
     onPendingPhotoRemoved: (String) -> Unit,
     onSubmitNote: () -> Unit,
     onDeleteNote: (Long) -> Unit,
     onDeletePhoto: (Long) -> Unit,
+    onStartEditNote: (JobNote) -> Unit,
+    onEditDraftChange: (String) -> Unit,
+    onCancelEditNote: () -> Unit,
+    onSaveEditNote: () -> Unit,
+    onAddPhotoToNote: (Long, String) -> Unit,
+    onViewPhotos: (Long, Long?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var viewingPhoto by remember { mutableStateOf<Photo?>(null) }
+    var viewerRequest by remember { mutableStateOf<PhotoViewerRequest?>(null) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -165,15 +188,39 @@ private fun JobDetailContent(
         items(notes, key = { it.id }) { note ->
             NoteRow(
                 note = note,
+                isEditing = editingNoteId == note.id,
+                editDraft = editingNoteDraft,
+                isSaving = isSavingEditedNote,
+                editError = if (editingNoteId == note.id) editNoteError else null,
                 onDelete = { onDeleteNote(note.id) },
                 onDeletePhoto = onDeletePhoto,
-                onPhotoClick = { photo -> viewingPhoto = photo },
+                onPhotoClick = { photo ->
+                    viewerRequest = PhotoViewerRequest(
+                        photos = note.photos,
+                        initialIndex = note.photos.indexOf(photo),
+                        caption = note.body,
+                    )
+                },
+                onStartEdit = { onStartEditNote(note) },
+                onEditDraftChange = onEditDraftChange,
+                onCancelEdit = onCancelEditNote,
+                onSaveEdit = onSaveEditNote,
+                onAddPhoto = { path -> onAddPhotoToNote(note.id, path) },
             )
         }
     }
 
-    viewingPhoto?.let { photo ->
-        PhotoViewerDialog(photo = photo, onDismiss = { viewingPhoto = null })
+    viewerRequest?.let { request ->
+        PhotoViewerDialog(
+            photos = request.photos,
+            initialIndex = request.initialIndex,
+            captionFor = { request.caption },
+            onDismiss = { viewerRequest = null },
+            onOpenGrid = { photo ->
+                viewerRequest = null
+                onViewPhotos(job.id, photo.id)
+            },
+        )
     }
 }
 
@@ -301,10 +348,32 @@ private fun RemovableThumbnail(filePath: String, onRemove: () -> Unit) {
 @Composable
 private fun NoteRow(
     note: JobNote,
+    isEditing: Boolean,
+    editDraft: String,
+    isSaving: Boolean,
+    editError: String?,
     onDelete: () -> Unit,
     onDeletePhoto: (Long) -> Unit,
     onPhotoClick: (Photo) -> Unit,
+    onStartEdit: () -> Unit,
+    onEditDraftChange: (String) -> Unit,
+    onCancelEdit: () -> Unit,
+    onSaveEdit: () -> Unit,
+    onAddPhoto: (String) -> Unit,
 ) {
+    val context = LocalContext.current
+    val photoStorage = remember { PhotoStorage(context.applicationContext) }
+    var pendingCapturePath by remember { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val path = pendingCapturePath
+        if (success && path != null) onAddPhoto(path)
+        pendingCapturePath = null
+    }
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) onAddPhoto(photoStorage.copyToAppStorage(uri))
+    }
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
@@ -314,13 +383,45 @@ private fun NoteRow(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(note.timestamp.toDisplayDateTime(), style = MaterialTheme.typography.labelSmall)
-                    if (note.body.isNotBlank()) {
+                    if (!isEditing && note.body.isNotBlank()) {
                         Text(note.body, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                if (!isEditing) {
+                    IconButton(onClick = onStartEdit) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit note")
                     }
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete note")
                 }
+            }
+            if (isEditing) {
+                OutlinedTextField(
+                    value = editDraft,
+                    onValueChange = onEditDraftChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Note") },
+                    enabled = !isSaving,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(onClick = {
+                        val target = photoStorage.createCaptureTarget()
+                        pendingCapturePath = target.filePath
+                        cameraLauncher.launch(target.uri)
+                    }) {
+                        Icon(Icons.Filled.PhotoCamera, contentDescription = "Take photo")
+                    }
+                    IconButton(onClick = {
+                        galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }) {
+                        Icon(Icons.Filled.PhotoLibrary, contentDescription = "Choose photo from gallery")
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    TextButton(onClick = onCancelEdit, enabled = !isSaving) { Text("Cancel") }
+                    TextButton(onClick = onSaveEdit, enabled = !isSaving) { Text("Save") }
+                }
+                editError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
             if (note.photos.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

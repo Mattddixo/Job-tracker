@@ -21,6 +21,7 @@ interface JobRepository {
 
     /** [photoPaths] are app-private file paths already copied in by PhotoStorage. */
     suspend fun addNote(jobId: Long, body: String, photoPaths: List<String> = emptyList()): JobNote
+    suspend fun updateNote(noteId: Long, body: String)
     suspend fun deleteNote(jobId: Long, noteId: Long)
 
     suspend fun addPhotoToNote(noteId: Long, filePath: String)

@@ -90,15 +90,22 @@ app/src/test/kotlin/com/homejobs/android/
 - **Cost/time variance is shown live in the form itself**, not just on the detail screen —
   typing an actual cost immediately shows how far over/under quote it is, in the same
   actual-minus-quoted convention as `Job.costVariance`.
-- **Tapping any photo opens a full-screen viewer** (`ui/common/PhotoViewerDialog.kt`) with Share
-  (Android's normal share sheet, via the same `FileProvider` used for camera capture) and Save-to-
-  gallery (copies into the device's public Pictures folder via MediaStore, so it shows up in the
-  regular Photos app independent of this one) actions, plus a small date caption from
-  `Photo.createdAt`. On API 26-28, saving requests `WRITE_EXTERNAL_STORAGE` at runtime the first
-  time; API 29+ needs no permission at all (scoped storage). A "view all photos" icon on the job
-  detail screen opens `JobPhotosScreen`, a grid of every photo across all of that job's notes
-  (newest first) — useful once a job has enough notes that a specific photo isn't easy to find by
-  scrolling the timeline.
+- **Tapping any photo opens a full-screen, swipeable viewer** (`ui/common/PhotoViewerDialog.kt`,
+  built on `HorizontalPager`). From a note's timeline, swiping browses that note's own photos;
+  from the all-photos grid, it browses every photo on the job. Actions: Share (Android's normal
+  share sheet, via the same `FileProvider` used for camera capture), Save to gallery (copies into
+  the device's public Pictures folder via MediaStore, so it shows up in the regular Photos app
+  independent of this one — API 26-28 requests `WRITE_EXTERNAL_STORAGE` at runtime the first
+  time, API 29+ needs no permission at all), and a "view all photos" button that jumps to the
+  full grid landing on the photo you were just viewing. The note's text shows as a togglable
+  caption (an eye icon hides/shows it, e.g. when it's covering part of the photo).
+- A "view all photos" icon on the job detail screen opens `JobPhotosScreen`, a grid of every
+  photo across all of that job's notes (newest first) — useful once a job has enough notes that a
+  specific photo isn't easy to find by scrolling the timeline.
+- **Notes are editable after saving**, not just deletable — a pencil icon puts a note's text into
+  an inline edit field (Save/Cancel), and the same camera/gallery buttons used when composing a
+  new note let you attach more photos to an already-saved one; removing a photo already worked
+  from either place.
 - **The theme is a hand-picked palette, not Material You.** `ui/theme/Color.kt` defines a
   slate-teal/sage/clay/warm-paper palette for both light and dark instead of stock Material
   swatches; Android 12+ wallpaper-extracted dynamic color is deliberately never used (it would

@@ -62,6 +62,10 @@ class FakeJobRepository : JobRepository {
         return note
     }
 
+    override suspend fun updateNote(noteId: Long, body: String) {
+        notesState.value = notesState.value.map { if (it.id == noteId) it.copy(body = body) else it }
+    }
+
     override suspend fun deleteNote(jobId: Long, noteId: Long) {
         notesState.value = notesState.value.filterNot { it.id == noteId }
     }

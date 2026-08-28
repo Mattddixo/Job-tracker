@@ -17,6 +17,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.homejobs.android.domain.model.Photo
 import com.homejobs.android.ui.common.EmptyState
 import com.homejobs.android.ui.common.PhotoViewerDialog
 import java.io.File
@@ -38,8 +38,20 @@ fun JobPhotosScreen(
     onBack: () -> Unit,
     viewModel: JobPhotosViewModel = hiltViewModel(),
 ) {
-    val photos by viewModel.photos.collectAsStateWithLifecycle()
-    var viewingPhoto by remember { mutableStateOf<Photo?>(null) }
+    val entries by viewModel.photoEntries.collectAsStateWithLifecycle()
+    val photos = remember(entries) { entries.map { it.photo } }
+    val captions = remember(entries) { entries.associate { it.photo.id to it.noteBody } }
+
+    var viewerIndex by remember { mutableStateOf<Int?>(null) }
+    var hasAutoOpened by remember { mutableStateOf(false) }
+
+    LaunchedEffect(entries) {
+        if (!hasAutoOpened && viewModel.focusPhotoId != null && photos.isNotEmpty()) {
+            val index = photos.indexOfFirst { it.id == viewModel.focusPhotoId }
+            if (index >= 0) viewerIndex = index
+            hasAutoOpened = true
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -69,14 +81,19 @@ fun JobPhotosScreen(
                         modifier = Modifier
                             .aspectRatio(1f)
                             .padding(2.dp)
-                            .clickable { viewingPhoto = photo },
+                            .clickable { viewerIndex = photos.indexOf(photo) },
                     )
                 }
             }
         }
     }
 
-    viewingPhoto?.let { photo ->
-        PhotoViewerDialog(photo = photo, onDismiss = { viewingPhoto = null })
+    viewerIndex?.let { index ->
+        PhotoViewerDialog(
+            photos = photos,
+            initialIndex = index,
+            captionFor = { photo -> captions[photo.id].orEmpty() },
+            onDismiss = { viewerIndex = null },
+        )
     }
 }

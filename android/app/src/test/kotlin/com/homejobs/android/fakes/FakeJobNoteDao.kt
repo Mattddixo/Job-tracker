@@ -28,6 +28,10 @@ class FakeJobNoteDao(private val photoDao: FakePhotoDao) : JobNoteDao {
         return id
     }
 
+    override suspend fun updateBody(noteId: Long, body: String) {
+        notesState.value = notesState.value.map { if (it.id == noteId) it.copy(body = body) else it }
+    }
+
     override suspend fun delete(noteId: Long) {
         notesState.value = notesState.value.filterNot { it.id == noteId }
         // Simulate the FK cascade Room performs at the database level.

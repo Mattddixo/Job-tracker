@@ -71,6 +71,10 @@ class JobRepositoryImpl @Inject constructor(
         return JobNote(id = noteId, jobId = jobId, timestamp = now, body = body, photos = photos)
     }
 
+    override suspend fun updateNote(noteId: Long, body: String) {
+        jobNoteDao.updateBody(noteId, body)
+    }
+
     override suspend fun deleteNote(jobId: Long, noteId: Long) {
         val photoPaths = photoDao.filePathsForNote(noteId)
         jobNoteDao.delete(noteId)

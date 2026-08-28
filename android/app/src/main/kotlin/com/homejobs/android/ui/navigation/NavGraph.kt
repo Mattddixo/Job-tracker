@@ -35,7 +35,7 @@ fun HomeJobsNavGraph(
             JobDetailScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { id -> navController.navigate(Routes.jobFormEdit(id)) },
-                onViewPhotos = { id -> navController.navigate(Routes.jobPhotos(id)) },
+                onViewPhotos = { id, photoId -> navController.navigate(Routes.jobPhotos(id, photoId)) },
             )
         }
         composable(
@@ -49,7 +49,10 @@ fun HomeJobsNavGraph(
         }
         composable(
             route = Routes.JOB_PHOTOS,
-            arguments = listOf(navArgument("jobId") { type = NavType.LongType }),
+            arguments = listOf(
+                navArgument("jobId") { type = NavType.LongType },
+                navArgument("photoId") { type = NavType.StringType; nullable = true },
+            ),
         ) {
             JobPhotosScreen(onBack = { navController.popBackStack() })
         }

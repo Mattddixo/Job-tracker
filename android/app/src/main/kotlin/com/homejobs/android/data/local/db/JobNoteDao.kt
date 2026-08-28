@@ -15,6 +15,9 @@ interface JobNoteDao {
     @Insert
     suspend fun insert(note: JobNoteEntity): Long
 
+    @Query("UPDATE job_notes SET body = :body WHERE id = :noteId")
+    suspend fun updateBody(noteId: Long, body: String)
+
     @Query("DELETE FROM job_notes WHERE id = :noteId")
     suspend fun delete(noteId: Long)
 }
