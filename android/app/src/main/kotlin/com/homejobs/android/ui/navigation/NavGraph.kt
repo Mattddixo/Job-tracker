@@ -8,10 +8,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.homejobs.android.ui.appearance.AppearanceScreen
 import com.homejobs.android.ui.jobs.detail.JobDetailScreen
 import com.homejobs.android.ui.jobs.form.JobFormScreen
 import com.homejobs.android.ui.jobs.list.JobListScreen
 import com.homejobs.android.ui.jobs.photos.JobPhotosScreen
+import com.homejobs.android.ui.theme.ColorPalette
 import com.homejobs.android.ui.theme.ThemeMode
 
 @Composable
@@ -19,6 +21,8 @@ fun HomeJobsNavGraph(
     navController: NavHostController = rememberNavController(),
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    colorPalette: ColorPalette,
+    onColorPaletteChange: (ColorPalette) -> Unit,
 ) {
     NavHost(navController = navController, startDestination = Routes.JOB_LIST) {
         composable(Routes.JOB_LIST) {
@@ -26,7 +30,7 @@ fun HomeJobsNavGraph(
                 onJobClick = { id -> navController.navigate(Routes.jobDetail(id)) },
                 onAddJobClick = { navController.navigate(Routes.jobFormCreate()) },
                 themeMode = themeMode,
-                onThemeModeChange = onThemeModeChange,
+                onOpenAppearance = { navController.navigate(Routes.APPEARANCE) },
             )
         }
         composable(
@@ -67,6 +71,15 @@ fun HomeJobsNavGraph(
                     navController.previousBackStackEntry?.savedStateHandle?.set("scrollToNoteId", noteId)
                     navController.popBackStack()
                 },
+            )
+        }
+        composable(Routes.APPEARANCE) {
+            AppearanceScreen(
+                onBack = { navController.popBackStack() },
+                themeMode = themeMode,
+                onThemeModeChange = onThemeModeChange,
+                colorPalette = colorPalette,
+                onColorPaletteChange = onColorPaletteChange,
             )
         }
     }

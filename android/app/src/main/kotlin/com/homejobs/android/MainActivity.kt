@@ -25,15 +25,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by themePreferences.themeMode.collectAsState()
+            val colorPalette by themePreferences.colorPalette.collectAsState()
             val darkTheme = when (themeMode) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
-            HomeJobsTrackerTheme(darkTheme = darkTheme) {
+            HomeJobsTrackerTheme(darkTheme = darkTheme, palette = colorPalette) {
                 HomeJobsNavGraph(
                     themeMode = themeMode,
                     onThemeModeChange = themePreferences::setThemeMode,
+                    colorPalette = colorPalette,
+                    onColorPaletteChange = themePreferences::setColorPalette,
                 )
             }
         }

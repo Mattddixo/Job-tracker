@@ -15,8 +15,6 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -30,9 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,7 +47,7 @@ fun JobListScreen(
     onJobClick: (Long) -> Unit,
     onAddJobClick: () -> Unit,
     themeMode: ThemeMode,
-    onThemeModeChange: (ThemeMode) -> Unit,
+    onOpenAppearance: () -> Unit,
     viewModel: JobListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -61,7 +56,7 @@ fun JobListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Home Jobs") },
-                actions = { ThemeModeAction(themeMode = themeMode, onThemeModeChange = onThemeModeChange) },
+                actions = { AppearanceAction(themeMode = themeMode, onClick = onOpenAppearance) },
             )
         },
         floatingActionButton = {
@@ -136,26 +131,14 @@ private fun JobRow(job: Job, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ThemeModeAction(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
-    var menuExpanded by remember { mutableStateOf(false) }
+private fun AppearanceAction(themeMode: ThemeMode, onClick: () -> Unit) {
     val icon = when (themeMode) {
         ThemeMode.LIGHT -> Icons.Filled.LightMode
         ThemeMode.DARK -> Icons.Filled.DarkMode
         ThemeMode.SYSTEM -> Icons.Filled.SettingsBrightness
     }
-    IconButton(onClick = { menuExpanded = true }) {
-        Icon(icon, contentDescription = "Theme: ${themeMode.label}")
-    }
-    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-        ThemeMode.entries.forEach { mode ->
-            DropdownMenuItem(
-                text = { Text(mode.label) },
-                onClick = {
-                    onThemeModeChange(mode)
-                    menuExpanded = false
-                },
-            )
-        }
+    IconButton(onClick = onClick) {
+        Icon(icon, contentDescription = "Appearance")
     }
 }
 

@@ -33,6 +33,7 @@ app/src/main/kotlin/com/homejobs/android/
   data/
     local/db/         Room entities, DAOs, database (jobs, job_notes, photos)
     local/photo/       PhotoStorage — copies camera/gallery images into app-private storage
+    local/prefs/       ThemePreferences — persisted theme mode + color palette choice
     repository/       JobRepositoryImpl (Room-backed) + Entity/domain mappers
   di/                 Hilt modules (database, repository)
   ui/
@@ -40,8 +41,9 @@ app/src/main/kotlin/com/homejobs/android/
     jobs/detail/       job detail + notes timeline + photo capture/viewer + ViewModel
     jobs/form/         sectioned create/edit form + ViewModel
     jobs/photos/       all-photos grid for a job + ViewModel
+    appearance/        theme mode + color palette picker screen
     navigation/        single-activity NavHost + routes
-    theme/             custom Material 3 theme (light/dark, persisted via SharedPreferences)
+    theme/             custom Material 3 theme — palettes, light/dark schemes, typography
     common/            shared loading/empty/error/photo-viewer composables, date formatting, EnumDropdown
 app/src/test/kotlin/com/homejobs/android/
   fakes/              hand-written fakes for JobRepository and the Room DAOs
@@ -106,14 +108,16 @@ app/src/test/kotlin/com/homejobs/android/
   an inline edit field (Save/Cancel), and the same camera/gallery buttons used when composing a
   new note let you attach more photos to an already-saved one; removing a photo already worked
   from either place.
-- **The theme is a hand-picked palette, not Material You.** `ui/theme/Color.kt` defines a
-  slate-teal/sage/clay/warm-paper palette for both light and dark instead of stock Material
-  swatches; Android 12+ wallpaper-extracted dynamic color is deliberately never used (it would
-  override the custom palette and make the app look like every other default Compose app).
-  Over/under quote and over/under time also read this palette (clay for over, sage for under)
-  instead of a plain error-red/primary split. The Light/Dark/System choice is made from the
-  icon in the job list's top bar and persists across restarts via `ThemePreferences`
-  (`SharedPreferences`-backed, defaults to System).
+- **The theme is a hand-picked palette, not Material You.** `ui/theme/Color.kt` defines four
+  full light+dark palettes (`ColorPalette.kt`) — Workshop (slate-teal/sage/clay, the default),
+  Terracotta, Forest, and Lavender — instead of stock Material swatches; Android 12+ wallpaper-
+  extracted dynamic color is deliberately never used (it would override the custom palette and
+  make the app look like every other default Compose app). Over/under quote and over/under time
+  read whichever palette is active (tertiary for over, secondary for under) instead of a plain
+  error-red/primary split. The theme icon in the job list's top bar opens an **Appearance**
+  screen (`ui/appearance/AppearanceScreen.kt`) — a Light/Dark/System toggle plus a small gallery
+  of palette swatch cards you tap through, applied live. Both choices persist across restarts
+  via `ThemePreferences` (`SharedPreferences`-backed; System/Workshop are the defaults).
 
 ## Running it
 
