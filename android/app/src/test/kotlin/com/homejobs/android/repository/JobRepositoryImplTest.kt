@@ -8,6 +8,7 @@ import com.homejobs.android.domain.model.JobStatus
 import com.homejobs.android.domain.model.JobUpsertInput
 import com.homejobs.android.fakes.FakeJobDao
 import com.homejobs.android.fakes.FakeJobNoteDao
+import com.homejobs.android.fakes.FakePaymentMethodDao
 import com.homejobs.android.fakes.FakePhotoDao
 import io.mockk.mockk
 import io.mockk.verify
@@ -24,6 +25,7 @@ class JobRepositoryImplTest {
     private lateinit var jobNoteDao: FakeJobNoteDao
     private lateinit var photoDao: FakePhotoDao
     private lateinit var photoStorage: PhotoStorage
+    private lateinit var paymentMethodDao: FakePaymentMethodDao
     private lateinit var repository: JobRepositoryImpl
 
     @Before
@@ -32,7 +34,8 @@ class JobRepositoryImplTest {
         photoDao = FakePhotoDao()
         jobNoteDao = FakeJobNoteDao(photoDao)
         photoStorage = mockk(relaxed = true)
-        repository = JobRepositoryImpl(jobDao, jobNoteDao, photoDao, photoStorage)
+        paymentMethodDao = FakePaymentMethodDao()
+        repository = JobRepositoryImpl(jobDao, jobNoteDao, photoDao, photoStorage, paymentMethodDao)
     }
 
     @Test
@@ -123,6 +126,32 @@ class JobRepositoryImplTest {
             assertTrue(awaitItem().single().photos.isEmpty())
         }
         verify { photoStorage.deleteFile("/data/photo.jpg") }
+    }
+
+    @Test
+    fun `addPaymentMethod and observePaymentMethods round-trip`() = runTest {
+        repository.addPaymentMethod("Visa", 2000.0)
+
+        repository.observePaymentMethods().test {
+            val methods = awaitItem()
+            assertEquals(1, methods.size)
+            assertEquals("Visa", methods.single().name)
+            assertEquals(2000.0, methods.single().maxCredit)
+        }
+    }
+
+    @Test
+    fun `updatePaymentMethod changes name and max credit without changing its id`() = runTest {
+        val created = repository.addPaymentMethod("Visa", 2000.0)
+
+        repository.updatePaymentMethod(created.id, "Visa Signature", 5000.0)
+
+        repository.observePaymentMethods().test {
+            val method = awaitItem().single()
+            assertEquals(created.id, method.id)
+            assertEquals("Visa Signature", method.name)
+            assertEquals(5000.0, method.maxCredit)
+        }
     }
 
     @Test

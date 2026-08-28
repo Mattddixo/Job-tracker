@@ -2,11 +2,13 @@ package com.homejobs.android.ui.jobs.detail
 
 import com.homejobs.android.domain.model.Job
 import com.homejobs.android.domain.model.JobNote
+import com.homejobs.android.domain.model.PaymentMethod
 import com.homejobs.android.ui.common.UiState
 
 data class JobDetailUiState(
     val job: UiState<Job> = UiState.Loading,
     val notes: List<JobNote> = emptyList(),
+    val paymentMethods: List<PaymentMethod> = emptyList(),
     val noteDraft: String = "",
     val pendingPhotoPaths: List<String> = emptyList(),
     val isSubmittingNote: Boolean = false,

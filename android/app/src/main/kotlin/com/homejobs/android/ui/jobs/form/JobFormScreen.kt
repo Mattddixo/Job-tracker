@@ -189,10 +189,11 @@ fun JobFormScreen(
                     optionLabel = { it.name },
                     onSelected = { status -> update { it.copy(paymentStatus = status) } },
                 )
-                OutlinedTextField(
-                    value = input.paymentMethod.orEmpty(),
-                    onValueChange = { text -> update { it.copy(paymentMethod = text.ifBlank { null }) } },
-                    label = { Text("Payment method") },
+                PaymentMethodField(
+                    methods = uiState.paymentMethods,
+                    selectedId = input.paymentMethodId,
+                    onSelected = { id -> update { it.copy(paymentMethodId = id) } },
+                    onAddNew = { name, maxCredit -> viewModel.createPaymentMethod(name, maxCredit) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

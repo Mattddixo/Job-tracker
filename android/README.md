@@ -41,6 +41,7 @@ app/src/main/kotlin/com/homejobs/android/
     jobs/detail/       job detail + notes timeline + photo capture/viewer + ViewModel
     jobs/form/         sectioned create/edit form + ViewModel
     jobs/photos/       all-photos grid for a job + ViewModel
+    stats/             cost-by-payment-method stats + manage payment methods + ViewModel
     appearance/        Light/Dark/Custom toggle + color wheel picker screen
     navigation/        single-activity NavHost + routes
     theme/             custom Material 3 theme — Light/Dark schemes, Custom color derivation, typography
@@ -121,6 +122,20 @@ app/src/test/kotlin/com/homejobs/android/
   convention as the built-in Dark scheme). The chosen mode and, once picked, the custom colors
   persist across restarts via `ThemePreferences` (`SharedPreferences`-backed; Light is the
   default).
+- **Payment methods are a small managed list, not free text.** A job's "payment method" is a
+  `paymentMethodId` foreign key into a `payment_methods` table (`PaymentMethod`: name + an
+  optional `maxCredit` — presence of a max credit is what makes something "a card," no separate
+  flag), picked from a dropdown in the job form (`PaymentMethodField.kt`) that ends with an
+  "add new" entry so a card can be created without leaving the form. Deleting a payment method
+  uses `onDelete = SET_NULL` (not `CASCADE`) — jobs using it just fall back to "Unassigned"
+  rather than being deleted; the Stats screen's delete confirmation says how many jobs that'll
+  affect.
+- **The Stats screen (`ui/stats/`) rolls up job costs per payment method**, split into
+  Paid/Partial/Unpaid using each job's `actualCost` — a quote isn't money that's actually gone
+  out on that method yet, so jobs without an actual cost count toward a method's job count but
+  not its dollar totals. Cards show a "$X of $Y limit used" bar against `maxCredit`. The same
+  screen's "Manage" view is the only place to add/edit/delete payment methods outside the job
+  form's inline "add new."
 
 ## Running it
 
@@ -173,10 +188,18 @@ logic worth re-implementing in a fake. Covered:
 
 - `JobRepositoryImplTest` — create/update (preserves `createdAt`)/delete a job, delete cascades
   to photo file cleanup, notes round-trip with their photos, adding/removing a photo from an
-  existing note, status filtering.
+  existing note, status filtering, payment method create/update round-trips.
 - `JobListViewModelTest` — status filtering, Active/Completed/All tab grouping, delete
   delegation.
 - `JobFormViewModelTest` — validation blocks save on bad input, valid input creates a job and
   fires the callback, editing pre-populates the form from the repository.
+- `StatsViewModelTest` — the paid/partial/unpaid grouping-by-method logic: sums split correctly
+  by `PaymentStatus`, a job with no `actualCost` counts toward `jobCount` but no total, jobs with
+  no payment method land in an "Unassigned" bucket that's omitted when it would be empty.
 - `DateFormattingTest` — date/date-time display formatting, including that sub-minute
   precision never leaks into what's shown.
+
+Note that Room's `onDelete = SET_NULL` foreign key behavior (deleting a payment method that's in
+use) is enforced by SQLite itself and isn't something the hand-written `FakeJobDao`/
+`FakePaymentMethodDao` model — it's covered by manual review and by trying it in a real build,
+not by a JVM unit test.

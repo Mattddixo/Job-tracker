@@ -30,7 +30,7 @@ data class JobUpsertInput(
     val completedDate: String? = null,
     val warrantyExpiry: String? = null,
     val paymentStatus: PaymentStatus = PaymentStatus.UNPAID,
-    val paymentMethod: String? = null,
+    val paymentMethodId: Long? = null,
 ) {
     /** Returns field-level validation errors; empty means the input is valid. */
     fun validate(): List<String> = buildList {

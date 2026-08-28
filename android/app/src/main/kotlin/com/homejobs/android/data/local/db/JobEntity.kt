@@ -1,9 +1,25 @@
 package com.homejobs.android.data.local.db
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "jobs")
+@Entity(
+    tableName = "jobs",
+    foreignKeys = [
+        ForeignKey(
+            entity = PaymentMethodEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["paymentMethodId"],
+            // Deleting a payment method must never delete a job — it just falls back to
+            // "Unassigned" (see StatsScreen), unlike the CASCADE used for a job's own children
+            // (notes/photos), which really should disappear with the job.
+            onDelete = ForeignKey.SET_NULL,
+        ),
+    ],
+    indices = [Index("paymentMethodId")],
+)
 data class JobEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
@@ -20,7 +36,7 @@ data class JobEntity(
     val completedDate: String?,
     val warrantyExpiry: String?,
     val paymentStatus: String,
-    val paymentMethod: String?,
+    val paymentMethodId: Long?,
     val createdAt: Long,
     val updatedAt: Long,
 )

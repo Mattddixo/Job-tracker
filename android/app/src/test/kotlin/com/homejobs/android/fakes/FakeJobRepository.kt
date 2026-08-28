@@ -4,6 +4,7 @@ import com.homejobs.android.domain.model.Job
 import com.homejobs.android.domain.model.JobFilter
 import com.homejobs.android.domain.model.JobNote
 import com.homejobs.android.domain.model.JobUpsertInput
+import com.homejobs.android.domain.model.PaymentMethod
 import com.homejobs.android.domain.model.Photo
 import com.homejobs.android.domain.repository.JobRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.map
 class FakeJobRepository : JobRepository {
     val jobsState = MutableStateFlow<List<Job>>(emptyList())
     val notesState = MutableStateFlow<List<JobNote>>(emptyList())
+    val paymentMethodsState = MutableStateFlow<List<PaymentMethod>>(emptyList())
 
     var createJobResult: ((JobUpsertInput) -> Job)? = null
     var deleteJobCalledWith: Long? = null
@@ -41,7 +43,7 @@ class FakeJobRepository : JobRepository {
             completedDate = input.completedDate,
             warrantyExpiry = input.warrantyExpiry,
             paymentStatus = input.paymentStatus,
-            paymentMethod = input.paymentMethod,
+            paymentMethodId = input.paymentMethodId,
             createdAt = 0L,
             updatedAt = 0L,
         ).also { jobsState.value = jobsState.value + it }
@@ -82,5 +84,24 @@ class FakeJobRepository : JobRepository {
 
     override suspend fun deletePhoto(photoId: Long) {
         notesState.value = notesState.value.map { note -> note.copy(photos = note.photos.filterNot { it.id == photoId }) }
+    }
+
+    override fun observePaymentMethods() = paymentMethodsState.map { it }
+
+    override suspend fun addPaymentMethod(name: String, maxCredit: Double?): PaymentMethod {
+        val method = PaymentMethod(id = (paymentMethodsState.value.maxOfOrNull { it.id } ?: 0) + 1, name = name, maxCredit = maxCredit)
+        paymentMethodsState.value = paymentMethodsState.value + method
+        return method
+    }
+
+    override suspend fun updatePaymentMethod(id: Long, name: String, maxCredit: Double?) {
+        paymentMethodsState.value = paymentMethodsState.value.map {
+            if (it.id == id) it.copy(name = name, maxCredit = maxCredit) else it
+        }
+    }
+
+    override suspend fun deletePaymentMethod(id: Long) {
+        paymentMethodsState.value = paymentMethodsState.value.filterNot { it.id == id }
+        jobsState.value = jobsState.value.map { if (it.paymentMethodId == id) it.copy(paymentMethodId = null) else it }
     }
 }

@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.homejobs.android.data.local.db.AppDatabase
 import com.homejobs.android.data.local.db.JobDao
 import com.homejobs.android.data.local.db.JobNoteDao
+import com.homejobs.android.data.local.db.PaymentMethodDao
 import com.homejobs.android.data.local.db.PhotoDao
 import dagger.Module
 import dagger.Provides
@@ -35,4 +36,7 @@ object DatabaseModule {
 
     @Provides
     fun providePhotoDao(database: AppDatabase): PhotoDao = database.photoDao()
+
+    @Provides
+    fun providePaymentMethodDao(database: AppDatabase): PaymentMethodDao = database.paymentMethodDao()
 }

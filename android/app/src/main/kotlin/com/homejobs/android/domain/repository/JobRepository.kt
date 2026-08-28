@@ -4,6 +4,7 @@ import com.homejobs.android.domain.model.Job
 import com.homejobs.android.domain.model.JobFilter
 import com.homejobs.android.domain.model.JobNote
 import com.homejobs.android.domain.model.JobUpsertInput
+import com.homejobs.android.domain.model.PaymentMethod
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -26,4 +27,9 @@ interface JobRepository {
 
     suspend fun addPhotoToNote(noteId: Long, filePath: String)
     suspend fun deletePhoto(photoId: Long)
+
+    fun observePaymentMethods(): Flow<List<PaymentMethod>>
+    suspend fun addPaymentMethod(name: String, maxCredit: Double?): PaymentMethod
+    suspend fun updatePaymentMethod(id: Long, name: String, maxCredit: Double?)
+    suspend fun deletePaymentMethod(id: Long)
 }

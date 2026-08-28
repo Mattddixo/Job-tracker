@@ -3,6 +3,8 @@ package com.homejobs.android.data.repository
 import com.homejobs.android.data.local.db.JobDao
 import com.homejobs.android.data.local.db.JobNoteDao
 import com.homejobs.android.data.local.db.JobNoteEntity
+import com.homejobs.android.data.local.db.PaymentMethodDao
+import com.homejobs.android.data.local.db.PaymentMethodEntity
 import com.homejobs.android.data.local.db.PhotoDao
 import com.homejobs.android.data.local.db.PhotoEntity
 import com.homejobs.android.data.local.photo.PhotoStorage
@@ -11,6 +13,7 @@ import com.homejobs.android.domain.model.JobFilter
 import com.homejobs.android.domain.model.JobNote
 import com.homejobs.android.domain.model.JobSortField
 import com.homejobs.android.domain.model.JobUpsertInput
+import com.homejobs.android.domain.model.PaymentMethod
 import com.homejobs.android.domain.model.Photo
 import com.homejobs.android.domain.model.SortDirection
 import com.homejobs.android.domain.repository.JobRepository
@@ -26,6 +29,7 @@ class JobRepositoryImpl @Inject constructor(
     private val jobNoteDao: JobNoteDao,
     private val photoDao: PhotoDao,
     private val photoStorage: PhotoStorage,
+    private val paymentMethodDao: PaymentMethodDao,
 ) : JobRepository {
 
     override fun observeJobs(filter: JobFilter): Flow<List<Job>> =
@@ -89,6 +93,23 @@ class JobRepositoryImpl @Inject constructor(
         val photo = photoDao.getById(photoId) ?: return
         photoDao.delete(photoId)
         photoStorage.deleteFile(photo.filePath)
+    }
+
+    override fun observePaymentMethods(): Flow<List<PaymentMethod>> =
+        paymentMethodDao.observeAll().map { entities -> entities.map { it.toDomain() } }
+
+    override suspend fun addPaymentMethod(name: String, maxCredit: Double?): PaymentMethod {
+        val entity = PaymentMethodEntity(name = name, maxCredit = maxCredit, createdAt = System.currentTimeMillis())
+        val id = paymentMethodDao.insert(entity)
+        return entity.copy(id = id).toDomain()
+    }
+
+    override suspend fun updatePaymentMethod(id: Long, name: String, maxCredit: Double?) {
+        paymentMethodDao.update(id, name, maxCredit)
+    }
+
+    override suspend fun deletePaymentMethod(id: Long) {
+        paymentMethodDao.delete(id)
     }
 
     private fun comparator(filter: JobFilter): Comparator<Job> {

@@ -29,12 +29,14 @@ class JobDetailViewModel @Inject constructor(
     val uiState: StateFlow<JobDetailUiState> = combine(
         repository.observeJob(jobId),
         repository.observeNotes(jobId),
+        repository.observePaymentMethods(),
         composer,
         noteEdit,
-    ) { job, notes, composerState, editState ->
+    ) { job, notes, paymentMethods, composerState, editState ->
         JobDetailUiState(
             job = job?.let { UiState.Success(it) } ?: UiState.Empty,
             notes = notes,
+            paymentMethods = paymentMethods,
             noteDraft = composerState.draft,
             pendingPhotoPaths = composerState.pendingPhotoPaths,
             isSubmittingNote = composerState.isSubmitting,

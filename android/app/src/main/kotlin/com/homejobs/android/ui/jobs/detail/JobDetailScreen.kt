@@ -57,6 +57,7 @@ import coil.compose.AsyncImage
 import com.homejobs.android.data.local.photo.PhotoStorage
 import com.homejobs.android.domain.model.Job
 import com.homejobs.android.domain.model.JobNote
+import com.homejobs.android.domain.model.PaymentMethod
 import com.homejobs.android.domain.model.Photo
 import com.homejobs.android.ui.common.ErrorState
 import com.homejobs.android.ui.common.LoadingState
@@ -110,6 +111,7 @@ fun JobDetailScreen(
             is UiState.Success -> JobDetailContent(
                 job = jobState.data,
                 notes = uiState.notes,
+                paymentMethods = uiState.paymentMethods,
                 noteDraft = uiState.noteDraft,
                 pendingPhotoPaths = uiState.pendingPhotoPaths,
                 isSubmittingNote = uiState.isSubmittingNote,
@@ -146,6 +148,7 @@ private const val NOTES_LIST_HEADER_COUNT = 3
 private fun JobDetailContent(
     job: Job,
     notes: List<JobNote>,
+    paymentMethods: List<PaymentMethod>,
     noteDraft: String,
     pendingPhotoPaths: List<String>,
     isSubmittingNote: Boolean,
@@ -188,7 +191,7 @@ private fun JobDetailContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { JobSummaryCard(job) }
+        item { JobSummaryCard(job, paymentMethods) }
         item { Text("Timeline", style = MaterialTheme.typography.titleMedium) }
         item {
             AddNoteCard(
@@ -247,7 +250,7 @@ private fun JobDetailContent(
 }
 
 @Composable
-private fun JobSummaryCard(job: Job) {
+private fun JobSummaryCard(job: Job, paymentMethods: List<PaymentMethod>) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(job.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -268,7 +271,9 @@ private fun JobSummaryCard(job: Job) {
             job.completedDate?.let { InfoRow("Completed", it.toDisplayDate()) }
             job.warrantyExpiry?.let { InfoRow("Warranty until", it.toDisplayDate()) }
             InfoRow("Payment status", job.paymentStatus.name)
-            job.paymentMethod?.let { InfoRow("Payment method", it) }
+            job.paymentMethodId
+                ?.let { id -> paymentMethods.firstOrNull { it.id == id }?.name }
+                ?.let { InfoRow("Payment method", it) }
         }
     }
 }

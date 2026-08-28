@@ -26,6 +26,12 @@ class JobFormViewModel @Inject constructor(
     val uiState: StateFlow<JobFormUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            repository.observePaymentMethods().collect { methods ->
+                _uiState.value = _uiState.value.copy(paymentMethods = methods)
+            }
+        }
+
         val id = jobId
         if (id != null) {
             viewModelScope.launch {
@@ -47,7 +53,7 @@ class JobFormViewModel @Inject constructor(
                         completedDate = job.completedDate,
                         warrantyExpiry = job.warrantyExpiry,
                         paymentStatus = job.paymentStatus,
-                        paymentMethod = job.paymentMethod,
+                        paymentMethodId = job.paymentMethodId,
                     ),
                 )
             }
@@ -56,6 +62,14 @@ class JobFormViewModel @Inject constructor(
 
     fun updateInput(transform: (JobUpsertInput) -> JobUpsertInput) {
         _uiState.value = _uiState.value.copy(input = transform(_uiState.value.input), errors = emptyList())
+    }
+
+    /** Creates a new payment method and immediately selects it on the job being edited. */
+    fun createPaymentMethod(name: String, maxCredit: Double?) {
+        viewModelScope.launch {
+            val method = repository.addPaymentMethod(name, maxCredit)
+            updateInput { it.copy(paymentMethodId = method.id) }
+        }
     }
 
     fun save(onSaved: () -> Unit) {

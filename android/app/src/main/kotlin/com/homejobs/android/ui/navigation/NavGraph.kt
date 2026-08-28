@@ -13,6 +13,7 @@ import com.homejobs.android.ui.jobs.detail.JobDetailScreen
 import com.homejobs.android.ui.jobs.form.JobFormScreen
 import com.homejobs.android.ui.jobs.list.JobListScreen
 import com.homejobs.android.ui.jobs.photos.JobPhotosScreen
+import com.homejobs.android.ui.stats.StatsScreen
 import com.homejobs.android.ui.theme.CustomColors
 import com.homejobs.android.ui.theme.ThemeMode
 
@@ -31,6 +32,7 @@ fun HomeJobsNavGraph(
                 onAddJobClick = { navController.navigate(Routes.jobFormCreate()) },
                 themeMode = themeMode,
                 onOpenAppearance = { navController.navigate(Routes.APPEARANCE) },
+                onOpenStats = { navController.navigate(Routes.STATS) },
             )
         }
         composable(
@@ -81,6 +83,9 @@ fun HomeJobsNavGraph(
                 customColors = customColors,
                 onCustomColorsChange = onCustomColorsChange,
             )
+        }
+        composable(Routes.STATS) {
+            StatsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

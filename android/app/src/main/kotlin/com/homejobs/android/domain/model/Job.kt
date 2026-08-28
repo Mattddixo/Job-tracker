@@ -20,7 +20,7 @@ data class Job(
     val completedDate: String?,
     val warrantyExpiry: String?,
     val paymentStatus: PaymentStatus,
-    val paymentMethod: String?,
+    val paymentMethodId: Long?,
     val createdAt: Long,
     val updatedAt: Long,
 ) {

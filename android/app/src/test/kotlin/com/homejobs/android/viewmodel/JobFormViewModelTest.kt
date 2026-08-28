@@ -73,7 +73,7 @@ class JobFormViewModelTest {
                 completedDate = null,
                 warrantyExpiry = null,
                 paymentStatus = com.homejobs.android.domain.model.PaymentStatus.UNPAID,
-                paymentMethod = null,
+                paymentMethodId = null,
                 createdAt = 0L,
                 updatedAt = 0L,
             ),

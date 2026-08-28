@@ -36,7 +36,7 @@ class JobListViewModelTest {
         completedDate = null,
         warrantyExpiry = null,
         paymentStatus = PaymentStatus.UNPAID,
-        paymentMethod = null,
+        paymentMethodId = null,
         createdAt = 0L,
         updatedAt = 0L,
     )
