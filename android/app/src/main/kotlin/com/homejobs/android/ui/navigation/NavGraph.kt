@@ -1,6 +1,7 @@
 package com.homejobs.android.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -31,11 +32,17 @@ fun HomeJobsNavGraph(
         composable(
             route = Routes.JOB_DETAIL,
             arguments = listOf(navArgument("jobId") { type = NavType.LongType }),
-        ) {
+        ) { backStackEntry ->
+            // A pending "scroll to this note" request left by JobPhotosScreen's "go to note"
+            // button — consumed once so returning to this same entry later doesn't re-trigger it.
+            val scrollToNoteId = remember(backStackEntry) {
+                backStackEntry.savedStateHandle.remove<Long>("scrollToNoteId")
+            }
             JobDetailScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { id -> navController.navigate(Routes.jobFormEdit(id)) },
                 onViewPhotos = { id, photoId -> navController.navigate(Routes.jobPhotos(id, photoId)) },
+                scrollToNoteId = scrollToNoteId,
             )
         }
         composable(
@@ -54,7 +61,13 @@ fun HomeJobsNavGraph(
                 navArgument("photoId") { type = NavType.StringType; nullable = true },
             ),
         ) {
-            JobPhotosScreen(onBack = { navController.popBackStack() })
+            JobPhotosScreen(
+                onBack = { navController.popBackStack() },
+                onGoToNote = { noteId ->
+                    navController.previousBackStackEntry?.savedStateHandle?.set("scrollToNoteId", noteId)
+                    navController.popBackStack()
+                },
+            )
         }
     }
 }

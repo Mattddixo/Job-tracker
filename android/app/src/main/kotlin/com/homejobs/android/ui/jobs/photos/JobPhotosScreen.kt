@@ -36,16 +36,15 @@ import java.io.File
 @Composable
 fun JobPhotosScreen(
     onBack: () -> Unit,
+    onGoToNote: (Long) -> Unit,
     viewModel: JobPhotosViewModel = hiltViewModel(),
 ) {
-    val entries by viewModel.photoEntries.collectAsStateWithLifecycle()
-    val photos = remember(entries) { entries.map { it.photo } }
-    val captions = remember(entries) { entries.associate { it.photo.id to it.noteBody } }
+    val photos by viewModel.photos.collectAsStateWithLifecycle()
 
     var viewerIndex by remember { mutableStateOf<Int?>(null) }
     var hasAutoOpened by remember { mutableStateOf(false) }
 
-    LaunchedEffect(entries) {
+    LaunchedEffect(photos) {
         if (!hasAutoOpened && viewModel.focusPhotoId != null && photos.isNotEmpty()) {
             val index = photos.indexOfFirst { it.id == viewModel.focusPhotoId }
             if (index >= 0) viewerIndex = index
@@ -92,8 +91,11 @@ fun JobPhotosScreen(
         PhotoViewerDialog(
             photos = photos,
             initialIndex = index,
-            captionFor = { photo -> captions[photo.id].orEmpty() },
             onDismiss = { viewerIndex = null },
+            onGoToNote = { photo ->
+                viewerIndex = null
+                onGoToNote(photo.noteId)
+            },
         )
     }
 }

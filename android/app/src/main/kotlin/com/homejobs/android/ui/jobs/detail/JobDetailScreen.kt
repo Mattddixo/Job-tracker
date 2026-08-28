@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -37,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +72,7 @@ fun JobDetailScreen(
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
     onViewPhotos: (Long, Long?) -> Unit,
+    scrollToNoteId: Long? = null,
     viewModel: JobDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -127,13 +130,17 @@ fun JobDetailScreen(
                 onSaveEditNote = viewModel::saveEditedNote,
                 onAddPhotoToNote = viewModel::addPhotoToNote,
                 onViewPhotos = onViewPhotos,
+                initialScrollToNoteId = scrollToNoteId,
                 modifier = Modifier.padding(padding),
             )
         }
     }
 }
 
-private data class PhotoViewerRequest(val photos: List<Photo>, val initialIndex: Int, val caption: String)
+private data class PhotoViewerRequest(val photos: List<Photo>, val initialIndex: Int)
+
+/** Number of fixed `item {}` entries before the notes themselves, for scroll-to-note math. */
+private const val NOTES_LIST_HEADER_COUNT = 3
 
 @Composable
 private fun JobDetailContent(
@@ -159,11 +166,24 @@ private fun JobDetailContent(
     onSaveEditNote: () -> Unit,
     onAddPhotoToNote: (Long, String) -> Unit,
     onViewPhotos: (Long, Long?) -> Unit,
+    initialScrollToNoteId: Long?,
     modifier: Modifier = Modifier,
 ) {
     var viewerRequest by remember { mutableStateOf<PhotoViewerRequest?>(null) }
+    var pendingScrollNoteId by remember { mutableStateOf(initialScrollToNoteId) }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(pendingScrollNoteId, notes) {
+        val targetId = pendingScrollNoteId ?: return@LaunchedEffect
+        val index = notes.indexOfFirst { it.id == targetId }
+        if (index >= 0) {
+            listState.animateScrollToItem(NOTES_LIST_HEADER_COUNT + index)
+            pendingScrollNoteId = null
+        }
+    }
 
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -198,7 +218,6 @@ private fun JobDetailContent(
                     viewerRequest = PhotoViewerRequest(
                         photos = note.photos,
                         initialIndex = note.photos.indexOf(photo),
-                        caption = note.body,
                     )
                 },
                 onStartEdit = { onStartEditNote(note) },
@@ -214,11 +233,14 @@ private fun JobDetailContent(
         PhotoViewerDialog(
             photos = request.photos,
             initialIndex = request.initialIndex,
-            captionFor = { request.caption },
             onDismiss = { viewerRequest = null },
             onOpenGrid = { photo ->
                 viewerRequest = null
                 onViewPhotos(job.id, photo.id)
+            },
+            onGoToNote = { photo ->
+                viewerRequest = null
+                pendingScrollNoteId = photo.noteId
             },
         )
     }

@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -32,9 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -105,26 +103,26 @@ private suspend fun PointerInputScope.detectPinchToZoom(onGesture: (pan: Offset,
  *
  * @param photos the set of photos to swipe between (a single note's photos, or every photo on
  *   the job) — [initialIndex] is where the pager opens.
- * @param captionFor text shown (togglable) under each photo, e.g. that photo's note body.
  * @param onOpenGrid when non-null, shows a button that jumps to the job's full photo grid,
  *   passed the photo currently on screen so the grid can land there. Omit when the viewer was
  *   already opened from that grid.
+ * @param onGoToNote when non-null, shows a button that closes the viewer and jumps to the note
+ *   the photo currently on screen is attached to.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PhotoViewerDialog(
     photos: List<Photo>,
     initialIndex: Int,
-    captionFor: (Photo) -> String,
     onDismiss: () -> Unit,
     onOpenGrid: ((Photo) -> Unit)? = null,
+    onGoToNote: ((Photo) -> Unit)? = null,
 ) {
     if (photos.isEmpty()) return
     val context = LocalContext.current
     val photoStorage = remember { PhotoStorage(context.applicationContext) }
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = initialIndex.coerceIn(0, photos.lastIndex)) { photos.size }
-    var showCaption by remember { mutableStateOf(true) }
     var permissionRequestPending by remember { mutableStateOf(false) }
 
     // Pinch-zoom/pan state for whichever photo is currently on screen — reset whenever the user
@@ -138,7 +136,6 @@ fun PhotoViewerDialog(
     }
 
     val currentPhoto = photos[pagerState.currentPage]
-    val caption = captionFor(currentPhoto)
 
     fun saveToGallery() {
         scope.launch {
@@ -203,8 +200,8 @@ fun PhotoViewerDialog(
             }
 
             // Everything lives in one panel anchored under the status bar: the action buttons,
-            // then the position/date line with its hide toggle, then the caption itself. Putting
-            // the info bar here — rather than at the bottom, under the gesture/navigation bar —
+            // then the position/date line. Putting the info bar here — rather than at the
+            // bottom, under the gesture/navigation bar —
             // sidesteps a real gotcha: a Dialog is its own separate window, and WindowInsets for
             // the navigation bar are not reliably delivered into it (unlike the status bar, which
             // came through fine), so bottom-anchored content could end up computing zero inset
@@ -233,6 +230,11 @@ fun PhotoViewerDialog(
                                 Icon(Icons.Filled.GridView, contentDescription = "View all photos", tint = Color.White)
                             }
                         }
+                        if (onGoToNote != null) {
+                            IconButton(onClick = { onGoToNote(currentPhoto) }) {
+                                Icon(Icons.Filled.Notes, contentDescription = "Go to note", tint = Color.White)
+                            }
+                        }
                         IconButton(onClick = {
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "image/jpeg"
@@ -259,47 +261,18 @@ fun PhotoViewerDialog(
                     color = Color.White.copy(alpha = 0.16f),
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (photos.size > 1) {
-                            "${pagerState.currentPage + 1} / ${photos.size}  ·  ${currentPhoto.createdAt.toDisplayDateTime()}"
-                        } else {
-                            currentPhoto.createdAt.toDisplayDateTime()
-                        },
-                        color = Color.White.copy(alpha = 0.85f),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (caption.isNotBlank()) {
-                        IconButton(
-                            onClick = { showCaption = !showCaption },
-                            modifier = Modifier.size(32.dp).padding(start = 8.dp),
-                        ) {
-                            Icon(
-                                if (showCaption) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (showCaption) "Hide caption" else "Show caption",
-                                tint = Color.White.copy(alpha = 0.85f),
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                }
-                if (showCaption && caption.isNotBlank()) {
-                    Text(
-                        text = caption,
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp),
-                    )
-                }
+                Text(
+                    text = if (photos.size > 1) {
+                        "${pagerState.currentPage + 1} / ${photos.size}  ·  ${currentPhoto.createdAt.toDisplayDateTime()}"
+                    } else {
+                        currentPhoto.createdAt.toDisplayDateTime()
+                    },
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                )
             }
         }
     }
