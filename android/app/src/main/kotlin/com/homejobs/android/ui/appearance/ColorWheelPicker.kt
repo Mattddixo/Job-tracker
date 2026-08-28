@@ -60,7 +60,7 @@ fun ColorWheelPicker(
                 .pointerInput(Unit) {
                     fun updateFrom(position: Offset) {
                         val center = Offset(size.width / 2f, size.height / 2f)
-                        val radius = size.minDimension / 2f
+                        val radius = minOf(size.width, size.height) / 2f
                         val delta = position - center
                         var angleDeg = Math.toDegrees(atan2(delta.y, delta.x).toDouble()).toFloat()
                         if (angleDeg < 0f) angleDeg += 360f
