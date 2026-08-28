@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -49,7 +48,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -59,6 +57,7 @@ import com.homejobs.android.domain.model.JobNote
 import com.homejobs.android.domain.model.Photo
 import com.homejobs.android.ui.common.ErrorState
 import com.homejobs.android.ui.common.LoadingState
+import com.homejobs.android.ui.common.PhotoViewerDialog
 import com.homejobs.android.ui.common.UiState
 import com.homejobs.android.ui.common.toDisplayDate
 import com.homejobs.android.ui.common.toDisplayDateTime
@@ -69,6 +68,7 @@ import java.io.File
 fun JobDetailScreen(
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
+    onViewPhotos: (Long) -> Unit,
     viewModel: JobDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -85,6 +85,9 @@ fun JobDetailScreen(
                 actions = {
                     val job = (uiState.job as? UiState.Success)?.data
                     if (job != null) {
+                        IconButton(onClick = { onViewPhotos(job.id) }) {
+                            Icon(Icons.Filled.PhotoLibrary, contentDescription = "View all photos")
+                        }
                         IconButton(onClick = { onEdit(job.id) }) {
                             Icon(Icons.Filled.Edit, contentDescription = "Edit job")
                         }
@@ -135,7 +138,7 @@ private fun JobDetailContent(
     onDeletePhoto: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var viewingPhoto by remember { mutableStateOf<String?>(null) }
+    var viewingPhoto by remember { mutableStateOf<Photo?>(null) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -164,13 +167,13 @@ private fun JobDetailContent(
                 note = note,
                 onDelete = { onDeleteNote(note.id) },
                 onDeletePhoto = onDeletePhoto,
-                onPhotoClick = { path -> viewingPhoto = path },
+                onPhotoClick = { photo -> viewingPhoto = photo },
             )
         }
     }
 
-    viewingPhoto?.let { path ->
-        PhotoViewerDialog(filePath = path, onDismiss = { viewingPhoto = null })
+    viewingPhoto?.let { photo ->
+        PhotoViewerDialog(photo = photo, onDismiss = { viewingPhoto = null })
     }
 }
 
@@ -300,7 +303,7 @@ private fun NoteRow(
     note: JobNote,
     onDelete: () -> Unit,
     onDeletePhoto: (Long) -> Unit,
-    onPhotoClick: (String) -> Unit,
+    onPhotoClick: (Photo) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -330,7 +333,7 @@ private fun NoteRow(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable { onPhotoClick(photo.filePath) },
+                                    .clickable { onPhotoClick(photo) },
                             )
                             IconButton(
                                 onClick = { onDeletePhoto(photo.id) },
@@ -342,22 +345,6 @@ private fun NoteRow(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PhotoViewerDialog(filePath: String, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Box(modifier = Modifier.wrapContentSize()) {
-            AsyncImage(
-                model = File(filePath),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onDismiss() },
-            )
         }
     }
 }

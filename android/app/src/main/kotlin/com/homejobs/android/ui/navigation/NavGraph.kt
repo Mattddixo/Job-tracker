@@ -10,6 +10,7 @@ import androidx.navigation.navArgument
 import com.homejobs.android.ui.jobs.detail.JobDetailScreen
 import com.homejobs.android.ui.jobs.form.JobFormScreen
 import com.homejobs.android.ui.jobs.list.JobListScreen
+import com.homejobs.android.ui.jobs.photos.JobPhotosScreen
 import com.homejobs.android.ui.theme.ThemeMode
 
 @Composable
@@ -34,6 +35,7 @@ fun HomeJobsNavGraph(
             JobDetailScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { id -> navController.navigate(Routes.jobFormEdit(id)) },
+                onViewPhotos = { id -> navController.navigate(Routes.jobPhotos(id)) },
             )
         }
         composable(
@@ -44,6 +46,12 @@ fun HomeJobsNavGraph(
                 onBack = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() },
             )
+        }
+        composable(
+            route = Routes.JOB_PHOTOS,
+            arguments = listOf(navArgument("jobId") { type = NavType.LongType }),
+        ) {
+            JobPhotosScreen(onBack = { navController.popBackStack() })
         }
     }
 }

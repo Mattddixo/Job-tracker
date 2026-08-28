@@ -1,7 +1,11 @@
 package com.homejobs.android.data.local.photo
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -43,5 +47,48 @@ class PhotoStorage @Inject constructor(@ApplicationContext private val context: 
 
     fun deleteFile(path: String) {
         runCatching { File(path).delete() }
+    }
+
+    /** A content:// Uri suitable for handing [filePath] to another app (e.g. a share sheet). */
+    fun shareUriFor(filePath: String): Uri =
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(filePath))
+
+    /**
+     * Copies [filePath] into the device's public Pictures gallery via MediaStore, so it shows up
+     * in the user's normal Photos app / file manager independent of this app. Blocking file I/O —
+     * call off the main thread. Returns false (rather than throwing) on any failure, since this is
+     * a best-effort "give me a copy" action, not a step in the app's own data flow.
+     */
+    fun saveToGallery(filePath: String): Boolean {
+        val source = File(filePath)
+        if (!source.exists()) return false
+
+        val resolver = context.contentResolver
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "HomeJobs_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/HomeJobsTracker")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        } else {
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+        val itemUri = resolver.insert(collection, values) ?: return false
+
+        return try {
+            val output = resolver.openOutputStream(itemUri) ?: throw IOException("Could not open $itemUri")
+            output.use { source.inputStream().use { input -> input.copyTo(it) } }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                resolver.update(itemUri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
+            }
+            true
+        } catch (e: IOException) {
+            resolver.delete(itemUri, null, null)
+            false
+        }
     }
 }

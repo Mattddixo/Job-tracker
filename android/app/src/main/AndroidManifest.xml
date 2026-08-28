@@ -1,5 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Only needed to save a copy of a photo into the public gallery on API 26-28; from API 29
+         (scoped storage) a MediaStore insert needs no permission at all. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <application
         android:name=".HomeJobsApplication"
         android:allowBackup="true"

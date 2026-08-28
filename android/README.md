@@ -39,9 +39,10 @@ app/src/main/kotlin/com/homejobs/android/
     jobs/list/        job list screen + ViewModel (Active/Completed/All tabs, sort)
     jobs/detail/       job detail + notes timeline + photo capture/viewer + ViewModel
     jobs/form/         sectioned create/edit form + ViewModel
+    jobs/photos/       all-photos grid for a job + ViewModel
     navigation/        single-activity NavHost + routes
     theme/             custom Material 3 theme (light/dark, persisted via SharedPreferences)
-    common/            shared loading/empty/error composables, date formatting, EnumDropdown
+    common/            shared loading/empty/error/photo-viewer composables, date formatting, EnumDropdown
 app/src/test/kotlin/com/homejobs/android/
   fakes/              hand-written fakes for JobRepository and the Room DAOs
   viewmodel/          ViewModel unit tests
@@ -89,6 +90,15 @@ app/src/test/kotlin/com/homejobs/android/
 - **Cost/time variance is shown live in the form itself**, not just on the detail screen —
   typing an actual cost immediately shows how far over/under quote it is, in the same
   actual-minus-quoted convention as `Job.costVariance`.
+- **Tapping any photo opens a full-screen viewer** (`ui/common/PhotoViewerDialog.kt`) with Share
+  (Android's normal share sheet, via the same `FileProvider` used for camera capture) and Save-to-
+  gallery (copies into the device's public Pictures folder via MediaStore, so it shows up in the
+  regular Photos app independent of this one) actions, plus a small date caption from
+  `Photo.createdAt`. On API 26-28, saving requests `WRITE_EXTERNAL_STORAGE` at runtime the first
+  time; API 29+ needs no permission at all (scoped storage). A "view all photos" icon on the job
+  detail screen opens `JobPhotosScreen`, a grid of every photo across all of that job's notes
+  (newest first) — useful once a job has enough notes that a specific photo isn't easy to find by
+  scrolling the timeline.
 - **The theme is a hand-picked palette, not Material You.** `ui/theme/Color.kt` defines a
   slate-teal/sage/clay/warm-paper palette for both light and dark instead of stock Material
   swatches; Android 12+ wallpaper-extracted dynamic color is deliberately never used (it would
