@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -96,18 +97,21 @@ fun JobFormScreen(
                     label = { Text("Title *") },
                     modifier = Modifier.fillMaxWidth(),
                     isError = uiState.errors.any { it.contains("Title") },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 )
                 OutlinedTextField(
                     value = input.category.orEmpty(),
                     onValueChange = { text -> update { it.copy(category = text.ifBlank { null }) } },
                     label = { Text("Category") },
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 )
                 OutlinedTextField(
                     value = input.location.orEmpty(),
                     onValueChange = { text -> update { it.copy(location = text.ifBlank { null }) } },
                     label = { Text("Room / location") },
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 )
             }
 
@@ -117,12 +121,14 @@ fun JobFormScreen(
                     onValueChange = { text -> update { it.copy(vendorName = text.ifBlank { null }) } },
                     label = { Text("Vendor / contractor") },
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 )
                 OutlinedTextField(
                     value = input.vendorContact.orEmpty(),
                     onValueChange = { text -> update { it.copy(vendorContact = text.ifBlank { null }) } },
                     label = { Text("Vendor contact") },
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 )
             }
 
