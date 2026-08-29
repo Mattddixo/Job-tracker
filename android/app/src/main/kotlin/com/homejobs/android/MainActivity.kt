@@ -102,6 +102,10 @@ class MainActivity : ComponentActivity() {
                 jobRepository.setLinkedJobJarId(link.jobId, link.otherId)
                 navController.navigate(Routes.jobDetail(link.jobId)) { launchSingleTop = true }
             }
+            is IncomingDeepLink.Unlinked -> lifecycleScope.launch {
+                jobRepository.setLinkedJobJarId(link.jobId, null)
+                navController.navigate(Routes.jobDetail(link.jobId)) { launchSingleTop = true }
+            }
         }
     }
 }

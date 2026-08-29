@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -65,6 +66,7 @@ import com.homejobs.android.domain.model.PaymentMethod
 import com.homejobs.android.domain.model.Photo
 import com.homejobs.android.ui.common.ErrorState
 import com.homejobs.android.ui.common.LoadingState
+import com.homejobs.android.ui.common.fireUnlinkedCallback
 import com.homejobs.android.ui.common.openInJobJar
 import com.homejobs.android.ui.common.PhotoViewerDialog
 import kotlin.math.roundToInt
@@ -116,6 +118,7 @@ fun JobDetailScreen(
             is UiState.Error -> ErrorState(jobState.message, modifier = Modifier.padding(padding))
             is UiState.Success -> JobDetailContent(
                 job = jobState.data,
+                onUnlinkJobJar = viewModel::unlinkJobJar,
                 notes = uiState.notes,
                 paymentMethods = uiState.paymentMethods,
                 noteDraft = uiState.noteDraft,
@@ -153,6 +156,7 @@ private const val NOTES_LIST_HEADER_COUNT = 3
 @Composable
 private fun JobDetailContent(
     job: Job,
+    onUnlinkJobJar: () -> Unit,
     notes: List<JobNote>,
     paymentMethods: List<PaymentMethod>,
     noteDraft: String,
@@ -197,7 +201,7 @@ private fun JobDetailContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { JobSummaryCard(job, paymentMethods) }
+        item { JobSummaryCard(job, paymentMethods, onUnlinkJobJar) }
         item { Text("Timeline", style = MaterialTheme.typography.titleMedium) }
         item {
             AddNoteCard(
@@ -256,7 +260,7 @@ private fun JobDetailContent(
 }
 
 @Composable
-private fun JobSummaryCard(job: Job, paymentMethods: List<PaymentMethod>) {
+private fun JobSummaryCard(job: Job, paymentMethods: List<PaymentMethod>, onUnlinkJobJar: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(job.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -281,7 +285,7 @@ private fun JobSummaryCard(job: Job, paymentMethods: List<PaymentMethod>) {
                 ?.let { id -> paymentMethods.firstOrNull { it.id == id }?.name }
                 ?.let { InfoRow("Payment method", it) }
             HorizontalDivider()
-            JobJarLinkActions(job)
+            JobJarLinkActions(job, onUnlinkJobJar)
         }
     }
 }
@@ -290,13 +294,16 @@ private fun JobSummaryCard(job: Job, paymentMethods: List<PaymentMethod>) {
  * Links this job to a Job Jar task (a separate, unrelated app for tracking chores) via implicit
  * `ACTION_VIEW` intents against its own custom URI scheme — the standard way for two local-only
  * Android apps on the same device to talk to each other without a shared backend. Once a link
- * exists it's the only thing shown here — "Send"/"Link" both disappear, so a job can never end
- * up linked to two different Job Jar tasks at once (see [Job.linkedJobJarId]).
+ * exists, "Send"/"Link" disappear and are replaced by "Open in Job Jar" plus a smaller "Unlink" —
+ * so a job can never end up linked to two different Job Jar tasks at once (see
+ * [Job.linkedJobJarId]), but a mistaken or outdated link can always be broken and redone.
  */
 @Composable
-private fun JobJarLinkActions(job: Job) {
+private fun JobJarLinkActions(job: Job, onUnlinkJobJar: () -> Unit) {
     val context = LocalContext.current
     val linkedJobJarId = job.linkedJobJarId
+    var showUnlinkConfirm by remember { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (linkedJobJarId == null) {
             OutlinedButton(
@@ -312,13 +319,42 @@ private fun JobJarLinkActions(job: Job) {
                 Text("Link to existing Job Jar job")
             }
         } else {
-            OutlinedButton(
-                onClick = { openInJobJar(context, Uri.parse("jobjar://job/$linkedJobJarId")) },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Open in Job Jar")
+                OutlinedButton(
+                    onClick = { openInJobJar(context, Uri.parse("jobjar://job/$linkedJobJarId")) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Open in Job Jar")
+                }
+                OutlinedButton(
+                    onClick = { showUnlinkConfirm = true },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Unlink")
+                }
             }
         }
+    }
+
+    if (showUnlinkConfirm && linkedJobJarId != null) {
+        AlertDialog(
+            onDismissRequest = { showUnlinkConfirm = false },
+            title = { Text("Unlink this job?") },
+            text = { Text("This job and its Job Jar task will no longer be linked. You can send or link it to a different task afterward.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    fireUnlinkedCallback(context, jobJarId = linkedJobJarId)
+                    onUnlinkJobJar()
+                    showUnlinkConfirm = false
+                }) { Text("Unlink") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnlinkConfirm = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 

@@ -119,4 +119,11 @@ class JobDetailViewModel @Inject constructor(
             onDeleted()
         }
     }
+
+    /** Clears this job's own half of a Job Jar link. The screen fires the matching
+     * `jobjar://unlinked` callback separately (before calling this), since only it has a
+     * Context to launch that intent from. */
+    fun unlinkJobJar() {
+        viewModelScope.launch { repository.setLinkedJobJarId(jobId, null) }
+    }
 }

@@ -185,9 +185,14 @@ back stack was already sitting on (nothing pops it while this app is merely back
 finished), so without this each round trip would push another duplicate copy on top, and Back
 would have to be pressed once per bounce before it did anything visible.
 
-- **Once `job.linkedJobJarId` is set, the job detail screen shows exactly one button: "Open in
-  Job Jar"** (`jobjar://job/{id}`) — true two-way navigation, usable from whichever side
-  originated the link. Until then, it shows two:
+- **Once `job.linkedJobJarId` is set, the job detail screen shows two buttons side by side, each
+  half-width: "Open in Job Jar"** (`jobjar://job/{id}`) — true two-way navigation, usable from
+  whichever side originated the link — **and "Unlink"**, which clears this job's own
+  `linkedJobJarId` and fires `jobjar://unlinked?jobId=...` so Job Jar clears its half too, behind
+  a confirmation dialog since it affects both apps at once. That's the deliberate way out of a
+  mistaken or outdated link — pick the wrong job, or need to point this one at a different task
+  later — without which a link, once made, could never be changed. Until a link exists, the job
+  detail screen shows two different buttons instead:
   - **"Send to Job Jar"** —
     `jobjar://newjob?title=...&category=...&sourceId=...&estimatedMinutes=...&scheduledDate=...`
     pre-fills a new Job Jar task's title, category, estimated duration, and (if set) scheduled

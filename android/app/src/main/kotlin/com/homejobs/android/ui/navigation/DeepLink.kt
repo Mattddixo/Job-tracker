@@ -33,6 +33,11 @@ sealed interface IncomingDeepLink {
      * established from the other side: this app's own job [jobId] should remember [otherId] as
      * the Job Jar job it's now linked to. */
     data class Linked(val jobId: Long, val otherId: Long) : IncomingDeepLink
+
+    /** `hometracker://unlinked?jobId=...` — the other half of an explicit Unlink action taken on
+     * the Job Jar side: this app's own job [jobId] should forget whatever Job Jar task it was
+     * linked to, since Job Jar just forgot its half too. */
+    data class Unlinked(val jobId: Long) : IncomingDeepLink
 }
 
 fun parseIncomingDeepLink(uri: Uri): IncomingDeepLink? = when (uri.host) {
@@ -50,5 +55,6 @@ fun parseIncomingDeepLink(uri: Uri): IncomingDeepLink? = when (uri.host) {
         val otherId = uri.getQueryParameter("otherId")?.toLongOrNull()
         if (jobId != null && otherId != null) IncomingDeepLink.Linked(jobId, otherId) else null
     }
+    "unlinked" -> uri.getQueryParameter("jobId")?.toLongOrNull()?.let { IncomingDeepLink.Unlinked(it) }
     else -> null
 }

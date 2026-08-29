@@ -31,3 +31,15 @@ fun fireLinkedCallback(context: Context, jobJarId: Long, trackerJobId: Long) {
         .build()
     openInJobJar(context, uri)
 }
+
+/**
+ * Fires the `jobjar://unlinked?jobId=` callback after this app has explicitly unlinked a job that
+ * was linked to Job Jar's [jobJarId], so Job Jar forgets its half of the link too — otherwise
+ * Job Jar would be left believing it's still linked to a job that no longer agrees.
+ */
+fun fireUnlinkedCallback(context: Context, jobJarId: Long) {
+    val uri = Uri.parse("jobjar://unlinked").buildUpon()
+        .appendQueryParameter("jobId", jobJarId.toString())
+        .build()
+    openInJobJar(context, uri)
+}
