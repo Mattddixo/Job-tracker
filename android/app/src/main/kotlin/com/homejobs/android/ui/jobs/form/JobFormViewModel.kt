@@ -1,23 +1,28 @@
 package com.homejobs.android.ui.jobs.form
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.homejobs.android.data.parsing.QuotePdfParser
 import com.homejobs.android.domain.model.JobUpsertInput
 import com.homejobs.android.domain.repository.JobRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
 class JobFormViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: JobRepository,
+    private val quotePdfParser: QuotePdfParser,
 ) : ViewModel() {
 
     private val jobId: Long? = (savedStateHandle.get<String>("jobId"))?.toLongOrNull()
@@ -70,6 +75,55 @@ class JobFormViewModel @Inject constructor(
             val method = repository.addPaymentMethod(name, maxCredit)
             updateInput { it.copy(paymentMethodId = method.id) }
         }
+    }
+
+    /**
+     * Pre-fills whichever of vendor name / vendor contact / quoted cost the PDF's text actually
+     * contained, leaving every other field (and any field the parser didn't find) exactly as it
+     * was — see [QuotePdfParser] and [com.homejobs.android.domain.parsing.QuoteTextParser] for why
+     * those three and only those three. Reports back what it did (or that it found nothing) so a
+     * confident-looking blank field isn't mistaken for "correctly empty."
+     */
+    fun importFromPdf(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isImportingPdf = true, pdfImportMessage = null)
+            val parsed = try {
+                withContext(Dispatchers.IO) { quotePdfParser.parse(uri) }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isImportingPdf = false,
+                    pdfImportMessage = "Couldn't read that file as a PDF.",
+                )
+                return@launch
+            }
+
+            val foundFields = buildList {
+                if (parsed.vendorName != null) add("vendor")
+                if (parsed.vendorContact != null) add("vendor contact")
+                if (parsed.quotedCost != null) add("quoted cost")
+            }
+            if (foundFields.isNotEmpty()) {
+                updateInput { input ->
+                    input.copy(
+                        vendorName = parsed.vendorName ?: input.vendorName,
+                        vendorContact = parsed.vendorContact ?: input.vendorContact,
+                        quotedCost = parsed.quotedCost ?: input.quotedCost,
+                    )
+                }
+            }
+            _uiState.value = _uiState.value.copy(
+                isImportingPdf = false,
+                pdfImportMessage = if (foundFields.isEmpty()) {
+                    "Couldn't find a vendor, contact, or total in that PDF — enter details manually."
+                } else {
+                    "Imported from PDF: ${foundFields.joinToString(", ")}."
+                },
+            )
+        }
+    }
+
+    fun dismissPdfImportMessage() {
+        _uiState.value = _uiState.value.copy(pdfImportMessage = null)
     }
 
     fun save(onSaved: () -> Unit) {

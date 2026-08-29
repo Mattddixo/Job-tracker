@@ -11,4 +11,6 @@ data class JobFormUiState(
     val isSaving: Boolean = false,
     val errors: List<String> = emptyList(),
     val saveError: String? = null,
+    val isImportingPdf: Boolean = false,
+    val pdfImportMessage: String? = null,
 )
