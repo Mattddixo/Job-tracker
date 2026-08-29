@@ -77,6 +77,8 @@ fun HomeJobsNavGraph(
                 navArgument("title") { type = NavType.StringType; nullable = true },
                 navArgument("category") { type = NavType.StringType; nullable = true },
                 navArgument("sourceJobJarId") { type = NavType.StringType; nullable = true },
+                navArgument("estimatedMinutes") { type = NavType.StringType; nullable = true },
+                navArgument("scheduledDate") { type = NavType.StringType; nullable = true },
             ),
         ) {
             JobFormScreen(

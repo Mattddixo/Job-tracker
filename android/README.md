@@ -183,12 +183,16 @@ callback, updates the repository directly) for both a cold start and an already-
 - **Once `job.linkedJobJarId` is set, the job detail screen shows exactly one button: "Open in
   Job Jar"** (`jobjar://job/{id}`) — true two-way navigation, usable from whichever side
   originated the link. Until then, it shows two:
-  - **"Send to Job Jar"** — `jobjar://newjob?title=...&category=...&sourceId=...` pre-fills a new
-    Job Jar task (title/category are the only fields both apps' models actually share). Nothing
-    is auto-saved — it lands on Job Jar's own create form, reviewed and saved like any other
-    task. On save, Job Jar fires `hometracker://linked?jobId=...&otherId=...` back, so *this*
-    job also learns the new task's id — the origin isn't left one-way blind to what it just
-    created.
+  - **"Send to Job Jar"** —
+    `jobjar://newjob?title=...&category=...&sourceId=...&estimatedMinutes=...&scheduledDate=...`
+    pre-fills a new Job Jar task's title, category, estimated duration, and (if set) scheduled
+    date. `predictedHours` converts to `estimatedMinutes` (× 60); `scheduledDate` — this app's own
+    field is date-only — carries over as-is and Job Jar defaults it to 9 AM local time once it
+    picks a time-of-day. Nothing is auto-saved — it lands on Job Jar's own create form, reviewed
+    and saved like any other task, and only takes effect (including writing a real calendar
+    event) once that form is actually saved. On save, Job Jar fires
+    `hometracker://linked?jobId=...&otherId=...` back, so *this* job also learns the new task's
+    id — the origin isn't left one-way blind to what it just created.
   - **"Link to existing Job Jar job"** — `jobjar://pickjob?returnJobId=...` opens a minimal
     picker over Job Jar's own job list (top-level jobs *and* subtasks — see below); picking one
     sets the link from that side and fires the same `linked` callback back.
@@ -203,6 +207,12 @@ callback, updates the repository directly) for both a cold start and an already-
   its own row with a `parentId` — can carry its own independent link to its own separate Tracker
   job, with its own separate cost/vendor tracking, entirely apart from whatever its parent task
   is linked to.
+- The reverse direction works the same way: a job sent *from* Job Jar with an `estimatedMinutes`
+  or `scheduledDate` value arrives here with `predictedHours`/`scheduledDate` pre-filled on the
+  create form — both ordinary, already-editable fields, so this needs no special-case UI the way
+  Job Jar's own create form does. This only ever happens via **Send**, never **Link** (which just
+  points two already-existing jobs at each other), and only at the moment of creation — later
+  edits on either side aren't kept in sync.
 
 ## Backing up your data
 

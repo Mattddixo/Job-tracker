@@ -29,6 +29,13 @@ class JobFormViewModel @Inject constructor(
     private val deepLinkCategory: String? = savedStateHandle.get<String>("category")
     private val deepLinkSourceJobJarId: Long? = savedStateHandle.get<String>("sourceJobJarId")?.toLongOrNull()
 
+    // Job Jar's estimatedMinutes converted to this app's hours unit, and its scheduledDate
+    // (already an ISO "yyyy-MM-dd" string on that side) passed straight through — both optional,
+    // present only when Job Jar had them set on the job being sent.
+    private val deepLinkPredictedHours: Double? =
+        savedStateHandle.get<String>("estimatedMinutes")?.toIntOrNull()?.let { it / 60.0 }
+    private val deepLinkScheduledDate: String? = savedStateHandle.get<String>("scheduledDate")
+
     private val _uiState = MutableStateFlow(
         JobFormUiState(
             isEditing = jobId != null,
@@ -38,6 +45,8 @@ class JobFormViewModel @Inject constructor(
                     title = deepLinkTitle,
                     category = deepLinkCategory,
                     linkedJobJarId = deepLinkSourceJobJarId,
+                    predictedHours = deepLinkPredictedHours,
+                    scheduledDate = deepLinkScheduledDate,
                 )
             } else {
                 JobUpsertInput(title = "")

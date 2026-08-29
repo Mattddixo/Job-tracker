@@ -67,6 +67,7 @@ import com.homejobs.android.ui.common.ErrorState
 import com.homejobs.android.ui.common.LoadingState
 import com.homejobs.android.ui.common.openInJobJar
 import com.homejobs.android.ui.common.PhotoViewerDialog
+import kotlin.math.roundToInt
 import com.homejobs.android.ui.common.UiState
 import com.homejobs.android.ui.common.toDisplayDate
 import com.homejobs.android.ui.common.toDisplayDateTime
@@ -326,6 +327,11 @@ private fun sendToJobJarUri(job: Job): Uri {
         .appendQueryParameter("title", job.title)
         .appendQueryParameter("sourceId", job.id.toString())
     job.category?.let { builder.appendQueryParameter("category", it) }
+    // Job Jar's estimatedMinutes is the wire format both directions convert to/from — this side
+    // converts its own hours unit into it here, and back into hours on the way in (see
+    // JobFormViewModel's deepLinkPredictedHours).
+    job.predictedHours?.let { hours -> builder.appendQueryParameter("estimatedMinutes", (hours * 60).roundToInt().toString()) }
+    job.scheduledDate?.let { builder.appendQueryParameter("scheduledDate", it) }
     return builder.build()
 }
 

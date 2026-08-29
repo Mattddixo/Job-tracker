@@ -83,7 +83,13 @@ class MainActivity : ComponentActivity() {
         when (link) {
             is IncomingDeepLink.ViewJob -> navController.navigate(Routes.jobDetail(link.jobId))
             is IncomingDeepLink.CreateJob -> navController.navigate(
-                Routes.jobFormFromDeepLink(link.title, link.category, link.sourceJobJarId),
+                Routes.jobFormFromDeepLink(
+                    link.title,
+                    link.category,
+                    link.sourceJobJarId,
+                    link.estimatedMinutes,
+                    link.scheduledDate,
+                ),
             )
             is IncomingDeepLink.PickJob -> navController.navigate(Routes.jobPicker(link.returnJobId))
             is IncomingDeepLink.Linked -> lifecycleScope.launch {

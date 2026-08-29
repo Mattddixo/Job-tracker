@@ -103,6 +103,23 @@ class JobFormViewModelTest {
     }
 
     @Test
+    fun `a Job Jar deep link also pre-fills estimated hours and scheduled date when present`() = runTest {
+        val repository = FakeJobRepository()
+        val savedStateHandle = SavedStateHandle(
+            mapOf(
+                "title" to "Buy water heater",
+                "estimatedMinutes" to "90",
+                "scheduledDate" to "2026-09-01",
+            ),
+        )
+
+        val viewModel = JobFormViewModel(savedStateHandle, repository)
+
+        assertEquals(1.5, viewModel.uiState.value.input.predictedHours)
+        assertEquals("2026-09-01", viewModel.uiState.value.input.scheduledDate)
+    }
+
+    @Test
     fun `save signals a fresh create as newly created`() = runTest {
         val repository = FakeJobRepository()
         val viewModel = JobFormViewModel(SavedStateHandle(), repository)
