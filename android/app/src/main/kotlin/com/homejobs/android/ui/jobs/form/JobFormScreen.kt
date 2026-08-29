@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -47,6 +48,7 @@ import com.homejobs.android.domain.model.JobUpsertInput
 import com.homejobs.android.domain.model.PaymentStatus
 import com.homejobs.android.ui.common.EnumDropdown
 import com.homejobs.android.ui.common.LoadingState
+import com.homejobs.android.ui.common.fireLinkedCallback
 import com.homejobs.android.ui.common.toDisplayDate
 import java.time.Instant
 import java.time.LocalDate
@@ -61,6 +63,7 @@ fun JobFormScreen(
     viewModel: JobFormViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -216,7 +219,19 @@ fun JobFormScreen(
             }
 
             Button(
-                onClick = { viewModel.save(onSaved) },
+                onClick = {
+                    viewModel.save { job, isNewlyCreated ->
+                        // Only on the create that just established a link — never on a later
+                        // edit-save of an already-linked job, which would otherwise re-fire this
+                        // and bounce Job Jar to the foreground on every unrelated edit.
+                        if (isNewlyCreated) {
+                            job.linkedJobJarId?.let { jobJarId ->
+                                fireLinkedCallback(context, jobJarId = jobJarId, trackerJobId = job.id)
+                            }
+                        }
+                        onSaved()
+                    }
+                },
                 enabled = !uiState.isSaving,
                 modifier = Modifier.fillMaxWidth(),
             ) {

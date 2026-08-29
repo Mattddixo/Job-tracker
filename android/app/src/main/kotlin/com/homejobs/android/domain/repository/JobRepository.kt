@@ -20,6 +20,9 @@ interface JobRepository {
     suspend fun updateJob(id: Long, input: JobUpsertInput): Job
     suspend fun deleteJob(id: Long)
 
+    /** Sets (or clears, with null) which Job Jar task this job is linked to. */
+    suspend fun setLinkedJobJarId(id: Long, linkedJobJarId: Long?)
+
     /** [photoPaths] are app-private file paths already copied in by PhotoStorage. */
     suspend fun addNote(jobId: Long, body: String, photoPaths: List<String> = emptyList()): JobNote
     suspend fun updateNote(noteId: Long, body: String)

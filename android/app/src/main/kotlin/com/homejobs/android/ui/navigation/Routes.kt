@@ -10,6 +10,7 @@ object Routes {
     const val APPEARANCE = "appearance"
     const val STATS = "stats"
     const val PAYMENT_METHODS = "paymentMethods"
+    const val JOB_PICKER = "jobPicker/{returnJobId}"
 
     fun jobDetail(jobId: Long) = "jobDetail/$jobId"
     fun jobFormCreate() = "jobForm"
@@ -27,4 +28,6 @@ object Routes {
 
     fun jobPhotos(jobId: Long, focusPhotoId: Long? = null) =
         if (focusPhotoId != null) "jobPhotos/$jobId?photoId=$focusPhotoId" else "jobPhotos/$jobId"
+
+    fun jobPicker(returnJobId: Long) = "jobPicker/$returnJobId"
 }

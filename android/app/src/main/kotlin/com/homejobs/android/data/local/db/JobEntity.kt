@@ -39,8 +39,9 @@ data class JobEntity(
     val paymentMethodId: Long?,
     val createdAt: Long,
     val updatedAt: Long,
-    // Opaque id of the Job Jar task this job was created from, if it arrived via that app's
-    // "Send to Job Tracker" deep link. No @ForeignKey — it points into a different app's
-    // database entirely, not a table in this one.
-    val spawnedFromJobJarId: Long? = null,
+    // Opaque id of the Job Jar task this job is linked to, however the link was established
+    // (this job was sent there, that task was sent here, or the two were linked directly via
+    // the picker). No @ForeignKey — it points into a different app's database entirely, not a
+    // table in this one.
+    val linkedJobJarId: Long? = null,
 )

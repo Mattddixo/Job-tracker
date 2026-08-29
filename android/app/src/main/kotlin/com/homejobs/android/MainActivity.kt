@@ -9,9 +9,11 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.homejobs.android.data.local.prefs.ThemePreferences
+import com.homejobs.android.domain.repository.JobRepository
 import com.homejobs.android.ui.navigation.HomeJobsNavGraph
 import com.homejobs.android.ui.navigation.IncomingDeepLink
 import com.homejobs.android.ui.navigation.Routes
@@ -19,6 +21,7 @@ import com.homejobs.android.ui.navigation.parseIncomingDeepLink
 import com.homejobs.android.ui.theme.HomeJobsTrackerTheme
 import com.homejobs.android.ui.theme.ThemeMode
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -26,6 +29,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var themePreferences: ThemePreferences
+
+    @Inject
+    lateinit var jobRepository: JobRepository
 
     // Set once, on the first composition, so onNewIntent (which runs outside any composable) can
     // still reach the same NavController the graph is using.
@@ -79,6 +85,11 @@ class MainActivity : ComponentActivity() {
             is IncomingDeepLink.CreateJob -> navController.navigate(
                 Routes.jobFormFromDeepLink(link.title, link.category, link.sourceJobJarId),
             )
+            is IncomingDeepLink.PickJob -> navController.navigate(Routes.jobPicker(link.returnJobId))
+            is IncomingDeepLink.Linked -> lifecycleScope.launch {
+                jobRepository.setLinkedJobJarId(link.jobId, link.otherId)
+                navController.navigate(Routes.jobDetail(link.jobId))
+            }
         }
     }
 }

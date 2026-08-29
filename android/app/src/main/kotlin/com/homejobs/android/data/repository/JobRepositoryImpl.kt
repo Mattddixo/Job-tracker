@@ -65,6 +65,10 @@ class JobRepositoryImpl @Inject constructor(
         photoPaths.forEach { photoStorage.deleteFile(it) }
     }
 
+    override suspend fun setLinkedJobJarId(id: Long, linkedJobJarId: Long?) {
+        jobDao.setLinkedJobJarId(id, linkedJobJarId)
+    }
+
     override suspend fun addNote(jobId: Long, body: String, photoPaths: List<String>): JobNote {
         val now = System.currentTimeMillis()
         val noteId = jobNoteDao.insert(JobNoteEntity(jobId = jobId, timestamp = now, body = body))

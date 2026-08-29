@@ -27,6 +27,11 @@ interface JobDao {
     @Update
     suspend fun update(job: JobEntity)
 
+    // Targeted UPDATE rather than a full @Update — this fires from the cross-app link flow,
+    // which only ever knows the two ids involved, not the rest of the job's current fields.
+    @Query("UPDATE jobs SET linkedJobJarId = :linkedJobJarId WHERE id = :id")
+    suspend fun setLinkedJobJarId(id: Long, linkedJobJarId: Long?)
+
     @Query("DELETE FROM jobs WHERE id = :id")
     suspend fun delete(id: Long)
 }

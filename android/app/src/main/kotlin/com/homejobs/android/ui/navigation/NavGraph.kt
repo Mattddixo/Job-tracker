@@ -16,6 +16,7 @@ import com.homejobs.android.ui.jobs.detail.JobDetailScreen
 import com.homejobs.android.ui.jobs.form.JobFormScreen
 import com.homejobs.android.ui.jobs.list.JobListScreen
 import com.homejobs.android.ui.jobs.photos.JobPhotosScreen
+import com.homejobs.android.ui.jobs.picker.JobPickerScreen
 import com.homejobs.android.ui.stats.PaymentMethodsScreen
 import com.homejobs.android.ui.stats.StatsScreen
 import com.homejobs.android.ui.theme.CustomColors
@@ -112,6 +113,12 @@ fun HomeJobsNavGraph(
         }
         composable(Routes.PAYMENT_METHODS) {
             PaymentMethodsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(
+            route = Routes.JOB_PICKER,
+            arguments = listOf(navArgument("returnJobId") { type = NavType.LongType }),
+        ) {
+            JobPickerScreen(onBack = { navController.popBackStack() })
         }
     }
 }

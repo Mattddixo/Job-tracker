@@ -46,7 +46,7 @@ class FakeJobRepository : JobRepository {
             paymentMethodId = input.paymentMethodId,
             createdAt = 0L,
             updatedAt = 0L,
-            spawnedFromJobJarId = input.spawnedFromJobJarId,
+            linkedJobJarId = input.linkedJobJarId,
         ).also { jobsState.value = jobsState.value + it }
 
     override suspend fun updateJob(id: Long, input: JobUpsertInput): Job = createJob(input)
@@ -54,6 +54,10 @@ class FakeJobRepository : JobRepository {
     override suspend fun deleteJob(id: Long) {
         deleteJobCalledWith = id
         jobsState.value = jobsState.value.filterNot { it.id == id }
+    }
+
+    override suspend fun setLinkedJobJarId(id: Long, linkedJobJarId: Long?) {
+        jobsState.value = jobsState.value.map { if (it.id == id) it.copy(linkedJobJarId = linkedJobJarId) else it }
     }
 
     override suspend fun addNote(jobId: Long, body: String, photoPaths: List<String>): JobNote {

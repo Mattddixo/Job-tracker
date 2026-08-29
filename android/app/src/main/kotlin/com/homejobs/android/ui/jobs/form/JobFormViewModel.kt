@@ -3,6 +3,7 @@ package com.homejobs.android.ui.jobs.form
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.homejobs.android.domain.model.Job
 import com.homejobs.android.domain.model.JobUpsertInput
 import com.homejobs.android.domain.repository.JobRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,7 +37,7 @@ class JobFormViewModel @Inject constructor(
                 JobUpsertInput(
                     title = deepLinkTitle,
                     category = deepLinkCategory,
-                    spawnedFromJobJarId = deepLinkSourceJobJarId,
+                    linkedJobJarId = deepLinkSourceJobJarId,
                 )
             } else {
                 JobUpsertInput(title = "")
@@ -92,7 +93,13 @@ class JobFormViewModel @Inject constructor(
         }
     }
 
-    fun save(onSaved: () -> Unit) {
+    /**
+     * [onResult] gets the saved job plus whether this was a fresh create (vs. editing an
+     * existing one) — the screen uses [isNewlyCreated] to decide whether to fire a
+     * `jobjar://linked` return callback (only ever on the create that just established a link,
+     * never on a later edit-save of an already-linked job).
+     */
+    fun save(onResult: (job: Job, isNewlyCreated: Boolean) -> Unit) {
         val input = _uiState.value.input
         val errors = input.validate()
         if (errors.isNotEmpty()) {
@@ -104,8 +111,8 @@ class JobFormViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isSaving = true, saveError = null)
             try {
                 val id = jobId
-                if (id != null) repository.updateJob(id, input) else repository.createJob(input)
-                onSaved()
+                val savedJob = if (id != null) repository.updateJob(id, input) else repository.createJob(input)
+                onResult(savedJob, id == null)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(saveError = e.message ?: "Failed to save job")
             }

@@ -41,11 +41,13 @@ app/src/main/kotlin/com/homejobs/android/
     jobs/detail/       job detail + notes timeline + photo capture/viewer + ViewModel
     jobs/form/         sectioned create/edit form + ViewModel
     jobs/photos/       all-photos grid for a job + ViewModel
+    jobs/picker/       job picker for linking to an existing Job Jar job + ViewModel
     stats/             cost-by-payment-method stats + manage payment methods + ViewModel
     appearance/        Light/Dark/Custom toggle + color wheel picker screen
     navigation/        single-activity NavHost + routes + DeepLink (Job Jar handoff)
     theme/             custom Material 3 theme — Light/Dark schemes, Custom color derivation, typography
-    common/            shared loading/empty/error/photo-viewer composables, date formatting, EnumDropdown
+    common/            shared loading/empty/error/photo-viewer composables, date formatting,
+                       EnumDropdown, CrossAppLink (Job Jar intents)
 app/src/test/kotlin/com/homejobs/android/
   fakes/              hand-written fakes for JobRepository and the Room DAOs
   viewmodel/          ViewModel unit tests
@@ -169,30 +171,38 @@ permission request from this app.
 
 ## Interop with Job Jar
 
-A job here can be handed off to [Job Jar](https://github.com/Mattddixo/Jobjar) (a separate,
-unrelated app for tracking chores to draw by time budget) and back, via implicit `ACTION_VIEW`
-intents against a custom URI scheme each app declares — the standard same-device mechanism for
-two local-only apps (no server, no shared account) to exchange data. `ui/navigation/DeepLink.kt`
-parses the incoming Uri; `MainActivity` calls `navController.navigate(...)` explicitly for both
-a cold start and an already-running instance (`onNewIntent`), rather than relying on
-Navigation-Compose's declarative deep-link auto-matching.
+A job here can be **linked** to a task in [Job Jar](https://github.com/Mattddixo/Jobjar) (a
+separate, unrelated app for tracking chores to draw by time budget) — a real, symmetric,
+duplicate-proof two-way link, not a one-shot copy — via implicit `ACTION_VIEW` intents against a
+custom URI scheme each app declares, the standard same-device mechanism for two local-only apps
+(no server, no shared account) to exchange data. `ui/navigation/DeepLink.kt` parses the incoming
+Uri; `MainActivity` calls `navController.navigate(...)` explicitly (or, for the `linked`
+callback, updates the repository directly) for both a cold start and an already-running instance
+(`onNewIntent`), rather than relying on Navigation-Compose's declarative deep-link auto-matching.
 
-- `hometracker://newjob?title=...&category=...&sourceId=...` — pre-fills a new job's title and
-  category (the only two fields both apps' domain models actually share) and remembers which
-  Job Jar task it came from, via `Job.spawnedFromJobJarId`. Nothing is auto-saved — it lands on
-  the normal create form, reviewed and saved like any other job.
-- `hometracker://job/{jobId}` — opens an existing job directly (what a Job Jar task's own "View
-  originating quote" button targets).
-- The job detail screen's "Send to Job Jar" button (always shown) builds the mirror-image
-  `jobjar://newjob?...` intent; "View originating task in Job Jar" only appears when
-  `spawnedFromJobJarId` is set. Either button shows a "Job Jar isn't installed" toast instead of
-  crashing if the target app isn't present (`ActivityNotFoundException`).
-- **Scope decision**: each side only remembers its own single origin — there's no list of
-  "everything this job spawned in Job Jar." Sending the same job to Job Jar multiple times still
-  works fine (each new Job Jar task independently remembers its own origin); what you don't get
-  is a single place that lists every task spawned from one job. That'd need a real one-to-many
-  join and a filtered browse view in Job Jar — a bigger feature, left for later if it turns out
-  to matter.
+- **Once `job.linkedJobJarId` is set, the job detail screen shows exactly one button: "Open in
+  Job Jar"** (`jobjar://job/{id}`) — true two-way navigation, usable from whichever side
+  originated the link. Until then, it shows two:
+  - **"Send to Job Jar"** — `jobjar://newjob?title=...&category=...&sourceId=...` pre-fills a new
+    Job Jar task (title/category are the only fields both apps' models actually share). Nothing
+    is auto-saved — it lands on Job Jar's own create form, reviewed and saved like any other
+    task. On save, Job Jar fires `hometracker://linked?jobId=...&otherId=...` back, so *this*
+    job also learns the new task's id — the origin isn't left one-way blind to what it just
+    created.
+  - **"Link to existing Job Jar job"** — `jobjar://pickjob?returnJobId=...` opens a minimal
+    picker over Job Jar's own job list (top-level jobs *and* subtasks — see below); picking one
+    sets the link from that side and fires the same `linked` callback back.
+- Both actions disappear the instant a link exists — **a linked job can't be sent or linked
+  again**, so there's no way to end up with two Job Jar tasks both claiming to be "the" link for
+  one job. `ui/jobs/picker/JobPickerScreen.kt` (this app's own picker, reached via Job Jar's
+  mirror-image "Link to existing Job Tracker job" button) filters out jobs that are already
+  linked to something for the same reason.
+- Either "Open"/"Send"/"Link" button shows a "Job Jar isn't installed" toast instead of crashing
+  if the target app isn't present (`ActivityNotFoundException`, in `ui/common/CrossAppLink.kt`).
+- **Because the link lives on the job row itself** (`linkedJobJarId`), a Job Jar *subtask* — just
+  its own row with a `parentId` — can carry its own independent link to its own separate Tracker
+  job, with its own separate cost/vendor tracking, entirely apart from whatever its parent task
+  is linked to.
 
 ## Backing up your data
 
@@ -223,7 +233,9 @@ logic worth re-implementing in a fake. Covered:
   delegation.
 - `JobFormViewModelTest` — validation blocks save on bad input, valid input creates a job and
   fires the callback, editing pre-populates the form from the repository, opening the form from
-  a Job Jar deep link pre-fills title/category/`spawnedFromJobJarId`.
+  a Job Jar deep link pre-fills title/category/`linkedJobJarId`, `save()` correctly signals
+  whether the save was a fresh create vs. an edit (what the screen uses to decide whether to
+  fire the `linked` return callback).
 - `StatsViewModelTest` — the paid/partial/unpaid grouping-by-method logic: sums split correctly
   by `PaymentStatus`, a job with no `actualCost` counts toward `jobCount` but no total, jobs with
   no payment method land in an "Unassigned" bucket that's omitted when it would be empty.
