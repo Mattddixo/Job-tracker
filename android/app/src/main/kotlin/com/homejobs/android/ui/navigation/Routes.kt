@@ -7,6 +7,7 @@ object Routes {
     const val JOB_PHOTOS = "jobPhotos/{jobId}?photoId={photoId}"
     const val APPEARANCE = "appearance"
     const val STATS = "stats"
+    const val PAYMENT_METHODS = "paymentMethods"
 
     fun jobDetail(jobId: Long) = "jobDetail/$jobId"
     fun jobFormCreate() = "jobForm"

@@ -128,14 +128,17 @@ app/src/test/kotlin/com/homejobs/android/
   flag), picked from a dropdown in the job form (`PaymentMethodField.kt`) that ends with an
   "add new" entry so a card can be created without leaving the form. Deleting a payment method
   uses `onDelete = SET_NULL` (not `CASCADE`) — jobs using it just fall back to "Unassigned"
-  rather than being deleted; the Stats screen's delete confirmation says how many jobs that'll
-  affect.
-- **The Stats screen (`ui/stats/`) rolls up job costs per payment method**, split into
+  rather than being deleted; the delete confirmation says how many jobs that'll affect.
+- **Stats and Payment Methods (`ui/stats/`) are two separate screens, each with their own icon
+  in the job list's top bar** (a credit-card icon and a bar-chart icon), rather than one nested
+  inside the other — payment methods are something you set up once and occasionally edit, not a
+  sub-view of looking at cost totals, so burying "Manage" behind an edit icon on the Stats screen
+  made it hard to find. `StatsScreen` rolls up job costs per payment method, split into
   Paid/Partial/Unpaid using each job's `actualCost` — a quote isn't money that's actually gone
   out on that method yet, so jobs without an actual cost count toward a method's job count but
-  not its dollar totals. Cards show a "$X of $Y limit used" bar against `maxCredit`. The same
-  screen's "Manage" view is the only place to add/edit/delete payment methods outside the job
-  form's inline "add new."
+  not its dollar totals — with a "$X of $Y limit used" bar against `maxCredit`.
+  `PaymentMethodsScreen` is the add/edit/delete CRUD list, sharing the same `StatsViewModel`
+  (and thus the same job-count-per-method data, for its delete confirmation) as `StatsScreen`.
 
 ## Running it
 

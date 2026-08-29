@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
@@ -50,6 +51,7 @@ fun JobListScreen(
     themeMode: ThemeMode,
     onOpenAppearance: () -> Unit,
     onOpenStats: () -> Unit,
+    onOpenPaymentMethods: () -> Unit,
     viewModel: JobListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -59,6 +61,9 @@ fun JobListScreen(
             TopAppBar(
                 title = { Text("Home Jobs") },
                 actions = {
+                    IconButton(onClick = onOpenPaymentMethods) {
+                        Icon(Icons.Filled.CreditCard, contentDescription = "Payment methods")
+                    }
                     IconButton(onClick = onOpenStats) {
                         Icon(Icons.Filled.BarChart, contentDescription = "Stats")
                     }
