@@ -87,7 +87,7 @@ class JobFormViewModel @Inject constructor(
     fun importFromPdf(uri: Uri) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isImportingPdf = true, pdfImportMessage = null)
-            val parsed = try {
+            val result = try {
                 withContext(Dispatchers.IO) { quotePdfParser.parse(uri) }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -97,6 +97,16 @@ class JobFormViewModel @Inject constructor(
                 return@launch
             }
 
+            if (!result.hasTextLayer) {
+                _uiState.value = _uiState.value.copy(
+                    isImportingPdf = false,
+                    pdfImportMessage = "That PDF looks like a scanned image, so there's no text to " +
+                        "read it from — enter details manually.",
+                )
+                return@launch
+            }
+
+            val parsed = result.quote
             val foundFields = buildList {
                 if (parsed.vendorName != null) add("vendor")
                 if (parsed.vendorContact != null) add("vendor contact")

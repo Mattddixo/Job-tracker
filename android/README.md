@@ -154,18 +154,30 @@ app/src/test/kotlin/com/homejobs/android/
   data-out logic). Only three fields are ever touched — **vendor name**, **vendor contact**
   (email preferred, phone as a fallback), and **quoted cost** — and each one comes back `null`
   unless a pattern matched with real confidence: the cost heuristic requires a dollar amount
-  with cents sitting next to a total-style label (checking specific labels like "Grand Total" /
-  "Balance Due" before falling back to a bare "Total", so a later grand total wins over an
-  earlier subtotal) rather than grabbing the first dollar figure on the page, and the vendor
-  name skips lines that are clearly a phone/email/address/invoice-number or a bare heading like
-  "ESTIMATE". A field the parser doesn't find is left exactly as it was — nothing is cleared,
-  nothing is invented — and the import result ("Imported from PDF: vendor, quoted cost." or
-  "Couldn't find a vendor, contact, or total…") is shown back so a still-blank field isn't
-  mistaken for one that was checked and found empty. Every imported value lands in the same
-  editable text field a hand-typed one would, so it's reviewed (and correctable) before Save is
-  ever pressed — nothing from a PDF is written to the database directly. A scanned/image-only
-  PDF (no text layer) comes back with all three fields null, same as any PDF nothing was found
-  in; adding an OCR fallback for that case is a separate, not-yet-built follow-up.
+  (cents mandatory unless a `$` is present — a bare "Total items: 5" doesn't get grabbed just
+  because it follows the word "total") sitting next to a total-style label (checking specific
+  labels like "Grand Total" / "Balance Due" / "Total Amount Due" before falling back to a bare
+  "Total", so a later grand total wins over an earlier subtotal) rather than grabbing the first
+  dollar figure on the page. The vendor-name heuristic skips lines that are clearly a
+  phone/email/address, mostly-digits (an invoice/PO number or a date), or — matched by a regex,
+  not exact equality, after a real invoice tripped up an earlier version that only excluded a
+  line that was *exactly* the word "invoice" — a document-type heading such as "Tax Invoice",
+  "Invoice #4471", or "Invoice Data" all followed by other words. A field the parser doesn't find
+  is left exactly as it was — nothing is cleared, nothing is invented — and the import result
+  ("Imported from PDF: vendor, quoted cost." or "Couldn't find a vendor, contact, or total…") is
+  shown back so a still-blank field isn't mistaken for one that was checked and found empty.
+  Every imported value lands in the same editable text field a hand-typed one would, so it's
+  reviewed (and correctable) before Save is ever pressed — nothing from a PDF is written to the
+  database directly.
+  A **scanned or "print to PDF" image** (a photographed or screenshotted invoice with no real
+  text behind it — confirmed by checking a real-world test file this way: it had zero embedded
+  fonts, every page was a flattened JPEG) can't be read by any text-based parser, PDFBox included.
+  Rather than silently returning three nulls and looking like a parsing failure,
+  `QuotePdfImportResult.hasTextLayer` flags this case explicitly (extracted text under ~20
+  characters counts as "none"), and the form says so directly — "That PDF looks like a scanned
+  image, so there's no text to read it from" — instead of the generic "couldn't find anything"
+  message. Actually reading a scanned quote needs OCR, which is a separate, not-yet-built
+  follow-up (see the invoice-digestion discussion this feature grew out of).
 
 ## Running it
 
@@ -224,15 +236,20 @@ logic worth re-implementing in a fake. Covered:
 - `JobFormViewModelTest` — validation blocks save on bad input, valid input creates a job and
   fires the callback, editing pre-populates the form from the repository, importing a PDF fills
   only the fields a (mocked) parser actually found and leaves the rest of the form untouched,
-  importing a PDF with nothing recognizable leaves every field as it was.
+  importing a PDF with nothing recognizable leaves every field as it was, importing a
+  scanned-image PDF (`hasTextLayer = false`) reports that distinctly rather than a generic
+  "nothing found".
 - `StatsViewModelTest` — the paid/partial/unpaid grouping-by-method logic: sums split correctly
   by `PaymentStatus`, a job with no `actualCost` counts toward `jobCount` but no total, jobs with
   no payment method land in an "Unassigned" bucket that's omitted when it would be empty.
 - `QuoteTextParserTest` — the actual regex heuristics behind PDF import: vendor name/contact/cost
   extraction from a realistic quote layout, a specific "Grand Total" winning over an earlier
-  generic "Subtotal", a bare line-item price with no total-style label correctly *not* being
-  treated as the total, and a text blob with no recognizable structure coming back with every
-  field null instead of a wrong guess.
+  generic "Subtotal", a bare line-item price (and a bare count like "Total items: 5") with no
+  total-style dollar amount correctly *not* being treated as the total, a whole-dollar total with
+  no cents still being recognized when a `$` is present, a heading line with extra words around
+  it ("Invoice Data", "Invoice #4471") correctly being excluded from the vendor-name guess instead
+  of only an exact "invoice" match, and a text blob with no recognizable structure coming back
+  with every field null instead of a wrong guess.
 - `DateFormattingTest` — date/date-time display formatting, including that sub-minute
   precision never leaks into what's shown.
 

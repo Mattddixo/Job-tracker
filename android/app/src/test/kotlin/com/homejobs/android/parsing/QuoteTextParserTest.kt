@@ -89,6 +89,65 @@ class QuoteTextParserTest {
     }
 
     @Test
+    fun `excludes a heading line that contains extra words, not just an exact match`() {
+        // Regression test: "Invoice Data" was previously picked as the vendor name because the
+        // old check only excluded a line that was *exactly* "invoice" — anything with extra
+        // words around it slipped through.
+        val text = """
+            Invoice Data
+
+            Sunrise Roofing
+
+            Total: $500.00
+        """.trimIndent()
+
+        val result = QuoteTextParser.parse(text)
+
+        assertEquals("Sunrise Roofing", result.vendorName)
+    }
+
+    @Test
+    fun `excludes an invoice-number heading with a hash`() {
+        val text = """
+            Invoice #4471
+
+            Sunrise Roofing
+
+            Total: $500.00
+        """.trimIndent()
+
+        val result = QuoteTextParser.parse(text)
+
+        assertEquals("Sunrise Roofing", result.vendorName)
+    }
+
+    @Test
+    fun `recognizes a whole-dollar total with no cents when a dollar sign is present`() {
+        val text = """
+            Sunrise Roofing
+
+            Total: $500
+        """.trimIndent()
+
+        val result = QuoteTextParser.parse(text)
+
+        assertEquals(500.0, result.quotedCost)
+    }
+
+    @Test
+    fun `does not treat an unrelated count next to a total-style word as a cost`() {
+        val text = """
+            Sunrise Roofing
+
+            Total items: 5
+        """.trimIndent()
+
+        val result = QuoteTextParser.parse(text)
+
+        assertNull(result.quotedCost)
+    }
+
+    @Test
     fun `returns every field null when nothing in the text matches`() {
         // No line here qualifies as a vendor name (both start with a digit, ruling out invoice
         // and PO numbers), and there's no email, phone, or total-style label anywhere.
