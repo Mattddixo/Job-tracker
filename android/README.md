@@ -43,7 +43,7 @@ app/src/main/kotlin/com/homejobs/android/
     jobs/photos/       all-photos grid for a job + ViewModel
     stats/             cost-by-payment-method stats + manage payment methods + ViewModel
     appearance/        Light/Dark/Custom toggle + color wheel picker screen
-    navigation/        single-activity NavHost + routes
+    navigation/        single-activity NavHost + routes + DeepLink (Job Jar handoff)
     theme/             custom Material 3 theme — Light/Dark schemes, Custom color derivation, typography
     common/            shared loading/empty/error/photo-viewer composables, date formatting, EnumDropdown
 app/src/test/kotlin/com/homejobs/android/
@@ -167,6 +167,33 @@ permission — there's nothing to talk to. The camera and gallery pickers are la
 system intents (`ACTION_IMAGE_CAPTURE`, the Android Photo Picker), so neither needs a runtime
 permission request from this app.
 
+## Interop with Job Jar
+
+A job here can be handed off to [Job Jar](https://github.com/Mattddixo/Jobjar) (a separate,
+unrelated app for tracking chores to draw by time budget) and back, via implicit `ACTION_VIEW`
+intents against a custom URI scheme each app declares — the standard same-device mechanism for
+two local-only apps (no server, no shared account) to exchange data. `ui/navigation/DeepLink.kt`
+parses the incoming Uri; `MainActivity` calls `navController.navigate(...)` explicitly for both
+a cold start and an already-running instance (`onNewIntent`), rather than relying on
+Navigation-Compose's declarative deep-link auto-matching.
+
+- `hometracker://newjob?title=...&category=...&sourceId=...` — pre-fills a new job's title and
+  category (the only two fields both apps' domain models actually share) and remembers which
+  Job Jar task it came from, via `Job.spawnedFromJobJarId`. Nothing is auto-saved — it lands on
+  the normal create form, reviewed and saved like any other job.
+- `hometracker://job/{jobId}` — opens an existing job directly (what a Job Jar task's own "View
+  originating quote" button targets).
+- The job detail screen's "Send to Job Jar" button (always shown) builds the mirror-image
+  `jobjar://newjob?...` intent; "View originating task in Job Jar" only appears when
+  `spawnedFromJobJarId` is set. Either button shows a "Job Jar isn't installed" toast instead of
+  crashing if the target app isn't present (`ActivityNotFoundException`).
+- **Scope decision**: each side only remembers its own single origin — there's no list of
+  "everything this job spawned in Job Jar." Sending the same job to Job Jar multiple times still
+  works fine (each new Job Jar task independently remembers its own origin); what you don't get
+  is a single place that lists every task spawned from one job. That'd need a real one-to-many
+  join and a filtered browse view in Job Jar — a bigger feature, left for later if it turns out
+  to matter.
+
 ## Backing up your data
 
 Since everything lives in this app's local database and private photo storage, uninstalling
@@ -195,7 +222,8 @@ logic worth re-implementing in a fake. Covered:
 - `JobListViewModelTest` — status filtering, Active/Completed/All tab grouping, delete
   delegation.
 - `JobFormViewModelTest` — validation blocks save on bad input, valid input creates a job and
-  fires the callback, editing pre-populates the form from the repository.
+  fires the callback, editing pre-populates the form from the repository, opening the form from
+  a Job Jar deep link pre-fills title/category/`spawnedFromJobJarId`.
 - `StatsViewModelTest` — the paid/partial/unpaid grouping-by-method logic: sums split correctly
   by `PaymentStatus`, a job with no `actualCost` counts toward `jobCount` but no total, jobs with
   no payment method land in an "Unassigned" bucket that's omitted when it would be empty.

@@ -31,6 +31,7 @@ fun JobEntity.toDomain() = Job(
     paymentMethodId = paymentMethodId,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    spawnedFromJobJarId = spawnedFromJobJarId,
 )
 
 fun JobUpsertInput.toEntity(id: Long = 0, createdAt: Long, updatedAt: Long) = JobEntity(
@@ -52,6 +53,7 @@ fun JobUpsertInput.toEntity(id: Long = 0, createdAt: Long, updatedAt: Long) = Jo
     paymentMethodId = paymentMethodId,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    spawnedFromJobJarId = spawnedFromJobJarId,
 )
 
 fun PaymentMethodEntity.toDomain() = PaymentMethod(id = id, name = name, maxCredit = maxCredit)

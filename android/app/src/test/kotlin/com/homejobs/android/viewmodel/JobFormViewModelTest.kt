@@ -76,6 +76,7 @@ class JobFormViewModelTest {
                 paymentMethodId = null,
                 createdAt = 0L,
                 updatedAt = 0L,
+                spawnedFromJobJarId = null,
             ),
         )
 
@@ -84,5 +85,20 @@ class JobFormViewModelTest {
         assertEquals("Existing job", viewModel.uiState.value.input.title)
         assertEquals("HVAC", viewModel.uiState.value.input.category)
         assertTrue(viewModel.uiState.value.isEditing)
+    }
+
+    @Test
+    fun `opening the form from a Job Jar deep link pre-fills title, category, and the link`() = runTest {
+        val repository = FakeJobRepository()
+        val savedStateHandle = SavedStateHandle(
+            mapOf("title" to "Buy water heater", "category" to "Plumbing", "sourceJobJarId" to "7"),
+        )
+
+        val viewModel = JobFormViewModel(savedStateHandle, repository)
+
+        assertEquals("Buy water heater", viewModel.uiState.value.input.title)
+        assertEquals("Plumbing", viewModel.uiState.value.input.category)
+        assertEquals(7L, viewModel.uiState.value.input.spawnedFromJobJarId)
+        assertFalse(viewModel.uiState.value.isEditing)
     }
 }

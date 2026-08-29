@@ -22,7 +22,27 @@ class JobFormViewModel @Inject constructor(
 
     private val jobId: Long? = (savedStateHandle.get<String>("jobId"))?.toLongOrNull()
 
-    private val _uiState = MutableStateFlow(JobFormUiState(isEditing = jobId != null, isLoading = jobId != null))
+    // Populated only when this form was opened via a hometracker://newjob deep link (e.g. Job
+    // Jar's "Send to Job Tracker" button) — see DeepLink.kt / Routes.jobFormFromDeepLink.
+    private val deepLinkTitle: String? = savedStateHandle.get<String>("title")
+    private val deepLinkCategory: String? = savedStateHandle.get<String>("category")
+    private val deepLinkSourceJobJarId: Long? = savedStateHandle.get<String>("sourceJobJarId")?.toLongOrNull()
+
+    private val _uiState = MutableStateFlow(
+        JobFormUiState(
+            isEditing = jobId != null,
+            isLoading = jobId != null,
+            input = if (jobId == null && deepLinkTitle != null) {
+                JobUpsertInput(
+                    title = deepLinkTitle,
+                    category = deepLinkCategory,
+                    spawnedFromJobJarId = deepLinkSourceJobJarId,
+                )
+            } else {
+                JobUpsertInput(title = "")
+            },
+        ),
+    )
     val uiState: StateFlow<JobFormUiState> = _uiState.asStateFlow()
 
     init {

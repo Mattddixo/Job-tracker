@@ -1,5 +1,10 @@
 package com.homejobs.android.ui.jobs.detail
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,6 +38,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -276,7 +282,53 @@ private fun JobSummaryCard(job: Job, paymentMethods: List<PaymentMethod>) {
             job.paymentMethodId
                 ?.let { id -> paymentMethods.firstOrNull { it.id == id }?.name }
                 ?.let { InfoRow("Payment method", it) }
+            HorizontalDivider()
+            JobJarLinkActions(job)
         }
+    }
+}
+
+/**
+ * Hands this job off to Job Jar (a separate, unrelated app for tracking chores) via an implicit
+ * `ACTION_VIEW` intent against its own custom URI scheme — the standard way for two local-only
+ * Android apps on the same device to talk to each other without a shared backend. Job Jar lands
+ * on its own create form pre-filled from the query string; nothing is saved on either side until
+ * the user reviews and confirms it there.
+ */
+@Composable
+private fun JobJarLinkActions(job: Job) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            onClick = { openInJobJar(context, sendToJobJarUri(job)) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Send to Job Jar")
+        }
+        job.spawnedFromJobJarId?.let { jobJarId ->
+            OutlinedButton(
+                onClick = { openInJobJar(context, Uri.parse("jobjar://job/$jobJarId")) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("View originating task in Job Jar")
+            }
+        }
+    }
+}
+
+private fun sendToJobJarUri(job: Job): Uri {
+    val builder = Uri.parse("jobjar://newjob").buildUpon()
+        .appendQueryParameter("title", job.title)
+        .appendQueryParameter("sourceId", job.id.toString())
+    job.category?.let { builder.appendQueryParameter("category", it) }
+    return builder.build()
+}
+
+private fun openInJobJar(context: Context, uri: Uri) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    } catch (e: ActivityNotFoundException) {
+        Toast.makeText(context, "Job Jar isn't installed", Toast.LENGTH_SHORT).show()
     }
 }
 

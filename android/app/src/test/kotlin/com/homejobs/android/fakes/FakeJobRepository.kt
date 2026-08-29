@@ -46,6 +46,7 @@ class FakeJobRepository : JobRepository {
             paymentMethodId = input.paymentMethodId,
             createdAt = 0L,
             updatedAt = 0L,
+            spawnedFromJobJarId = input.spawnedFromJobJarId,
         ).also { jobsState.value = jobsState.value + it }
 
     override suspend fun updateJob(id: Long, input: JobUpsertInput): Job = createJob(input)

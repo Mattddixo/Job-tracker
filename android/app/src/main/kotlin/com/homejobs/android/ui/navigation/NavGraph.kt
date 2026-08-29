@@ -71,7 +71,12 @@ fun HomeJobsNavGraph(
         }
         composable(
             route = Routes.JOB_FORM,
-            arguments = listOf(navArgument("jobId") { type = NavType.StringType; nullable = true }),
+            arguments = listOf(
+                navArgument("jobId") { type = NavType.StringType; nullable = true },
+                navArgument("title") { type = NavType.StringType; nullable = true },
+                navArgument("category") { type = NavType.StringType; nullable = true },
+                navArgument("sourceJobJarId") { type = NavType.StringType; nullable = true },
+            ),
         ) {
             JobFormScreen(
                 onBack = { navController.popBackStack() },

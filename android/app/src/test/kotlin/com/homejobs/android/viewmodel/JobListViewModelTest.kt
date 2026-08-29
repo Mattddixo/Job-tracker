@@ -39,6 +39,7 @@ class JobListViewModelTest {
         paymentMethodId = null,
         createdAt = 0L,
         updatedAt = 0L,
+        spawnedFromJobJarId = null,
     )
 
     @Test

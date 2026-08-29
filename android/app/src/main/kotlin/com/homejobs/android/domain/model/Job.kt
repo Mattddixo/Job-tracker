@@ -23,6 +23,7 @@ data class Job(
     val paymentMethodId: Long?,
     val createdAt: Long,
     val updatedAt: Long,
+    val spawnedFromJobJarId: Long?,
 ) {
     val costVariance: Double?
         get() = if (actualCost != null && quotedCost != null) actualCost - quotedCost else null
