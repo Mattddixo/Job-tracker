@@ -80,8 +80,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun navigateTo(navController: NavHostController, link: IncomingDeepLink) {
+        // launchSingleTop matters a lot more here than in an ordinary in-app navigate() call:
+        // bouncing back and forth with Job Jar via the "Open in..." button always re-navigates to
+        // the exact same destination this app's own back stack was already sitting on (nothing
+        // popped it while this app was merely backgrounded, not finished) — without this, every
+        // round trip pushed a fresh duplicate copy on top, so Back had to be pressed once per
+        // bounce before it would actually leave the screen.
         when (link) {
-            is IncomingDeepLink.ViewJob -> navController.navigate(Routes.jobDetail(link.jobId))
+            is IncomingDeepLink.ViewJob -> navController.navigate(Routes.jobDetail(link.jobId)) { launchSingleTop = true }
             is IncomingDeepLink.CreateJob -> navController.navigate(
                 Routes.jobFormFromDeepLink(
                     link.title,
@@ -90,11 +96,11 @@ class MainActivity : ComponentActivity() {
                     link.estimatedMinutes,
                     link.scheduledDate,
                 ),
-            )
-            is IncomingDeepLink.PickJob -> navController.navigate(Routes.jobPicker(link.returnJobId))
+            ) { launchSingleTop = true }
+            is IncomingDeepLink.PickJob -> navController.navigate(Routes.jobPicker(link.returnJobId)) { launchSingleTop = true }
             is IncomingDeepLink.Linked -> lifecycleScope.launch {
                 jobRepository.setLinkedJobJarId(link.jobId, link.otherId)
-                navController.navigate(Routes.jobDetail(link.jobId))
+                navController.navigate(Routes.jobDetail(link.jobId)) { launchSingleTop = true }
             }
         }
     }
