@@ -1,7 +1,7 @@
 package com.homejobs.android
 
 import android.app.Application
-import com.tom_roush.pdfbox.util.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
