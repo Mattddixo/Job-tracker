@@ -1,5 +1,8 @@
 package com.homejobs.android.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
@@ -18,6 +21,8 @@ import com.homejobs.android.ui.stats.StatsScreen
 import com.homejobs.android.ui.theme.CustomColors
 import com.homejobs.android.ui.theme.ThemeMode
 
+private const val TRANSITION_DURATION_MS = 200
+
 @Composable
 fun HomeJobsNavGraph(
     navController: NavHostController = rememberNavController(),
@@ -26,7 +31,18 @@ fun HomeJobsNavGraph(
     customColors: CustomColors,
     onCustomColorsChange: (CustomColors) -> Unit,
 ) {
-    NavHost(navController = navController, startDestination = Routes.JOB_LIST) {
+    // A plain slide (no fade/scale) instead of the library's default fade-through — the fade
+    // briefly reveals the surface behind both screens, which reads as the page "flashing
+    // brighter," and its longer duration makes navigation feel sluggish. A short slide is fast
+    // and has no crossfade to flash.
+    NavHost(
+        navController = navController,
+        startDestination = Routes.JOB_LIST,
+        enterTransition = { slideInHorizontally(tween(TRANSITION_DURATION_MS)) { fullWidth -> fullWidth } },
+        exitTransition = { slideOutHorizontally(tween(TRANSITION_DURATION_MS)) { fullWidth -> -fullWidth / 4 } },
+        popEnterTransition = { slideInHorizontally(tween(TRANSITION_DURATION_MS)) { fullWidth -> -fullWidth / 4 } },
+        popExitTransition = { slideOutHorizontally(tween(TRANSITION_DURATION_MS)) { fullWidth -> fullWidth } },
+    ) {
         composable(Routes.JOB_LIST) {
             JobListScreen(
                 onJobClick = { id -> navController.navigate(Routes.jobDetail(id)) },
