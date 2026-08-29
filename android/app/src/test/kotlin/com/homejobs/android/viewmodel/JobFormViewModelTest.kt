@@ -88,6 +88,43 @@ class JobFormViewModelTest {
     }
 
     @Test
+    fun `editing and saving an already-linked job keeps its Job Jar link`() = runTest {
+        val repository = FakeJobRepository()
+        repository.jobsState.value = listOf(
+            Job(
+                id = 42,
+                title = "Existing job",
+                category = "HVAC",
+                location = null,
+                vendorName = null,
+                vendorContact = null,
+                status = com.homejobs.android.domain.model.JobStatus.SCHEDULED,
+                quotedCost = 200.0,
+                actualCost = null,
+                predictedHours = null,
+                actualHours = null,
+                scheduledDate = null,
+                completedDate = null,
+                warrantyExpiry = null,
+                paymentStatus = com.homejobs.android.domain.model.PaymentStatus.UNPAID,
+                paymentMethodId = null,
+                createdAt = 0L,
+                updatedAt = 0L,
+                linkedJobJarId = 7,
+            ),
+        )
+
+        val viewModel = JobFormViewModel(SavedStateHandle(mapOf("jobId" to "42")), repository)
+        assertEquals(7L, viewModel.uiState.value.input.linkedJobJarId)
+
+        viewModel.updateInput { it.copy(vendorName = "Acme Plumbing") }
+        var savedJob: Job? = null
+        viewModel.save { job, _ -> savedJob = job }
+
+        assertEquals(7L, savedJob?.linkedJobJarId)
+    }
+
+    @Test
     fun `opening the form from a Job Jar deep link pre-fills title, category, and the link`() = runTest {
         val repository = FakeJobRepository()
         val savedStateHandle = SavedStateHandle(

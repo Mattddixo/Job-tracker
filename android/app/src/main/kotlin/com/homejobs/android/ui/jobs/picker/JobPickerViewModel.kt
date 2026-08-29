@@ -29,10 +29,17 @@ class JobPickerViewModel @Inject constructor(
 
     val returnJobId: Long = checkNotNull(savedStateHandle["returnJobId"])
 
-    /** Only jobs not already linked to something — picking an already-linked job would silently
-     * orphan its existing link. */
+    /**
+     * Every job, sorted by title — deliberately NOT filtered down to only-unlinked. The two
+     * sides of a link can end up desynced (e.g. one side's own copy of the link got cleared by
+     * a bug, or a job on either side was deleted and its id later reused) with no way for either
+     * app to detect that on its own — the only reliable fix is to just let the user re-pick and
+     * re-establish the correct pairing directly, rather than hard-blocking a job because ITS OWN
+     * possibly-stale record claims it's "already" linked to something. Picking any job here always
+     * overwrites its previous linkedJobJarId, whatever that was.
+     */
     val pickableJobs: StateFlow<List<Job>> = repository.observeJobs(JobFilter())
-        .map { jobs -> jobs.filter { it.linkedJobJarId == null }.sortedBy { it.title.lowercase() } }
+        .map { jobs -> jobs.sortedBy { it.title.lowercase() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun linkTo(job: Job, onLinked: (Job) -> Unit) {

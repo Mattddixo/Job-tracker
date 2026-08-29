@@ -84,6 +84,7 @@ class JobFormViewModel @Inject constructor(
                         warrantyExpiry = job.warrantyExpiry,
                         paymentStatus = job.paymentStatus,
                         paymentMethodId = job.paymentMethodId,
+                        linkedJobJarId = job.linkedJobJarId,
                     ),
                 )
             }

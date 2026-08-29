@@ -197,10 +197,15 @@ callback, updates the repository directly) for both a cold start and an already-
     picker over Job Jar's own job list (top-level jobs *and* subtasks — see below); picking one
     sets the link from that side and fires the same `linked` callback back.
 - Both actions disappear the instant a link exists — **a linked job can't be sent or linked
-  again**, so there's no way to end up with two Job Jar tasks both claiming to be "the" link for
-  one job. `ui/jobs/picker/JobPickerScreen.kt` (this app's own picker, reached via Job Jar's
-  mirror-image "Link to existing Job Tracker job" button) filters out jobs that are already
-  linked to something for the same reason.
+  again**, so there's no fresh code path that could create a second link for one job. That's not
+  quite the same as saying a link can never be *wrong*, though: the two sides can still end up
+  desynced (one side's own field cleared by a bug, or a linked job deleted and its id later
+  reused for something unrelated), and neither app can detect that on its own. So
+  `ui/jobs/picker/JobPickerScreen.kt` (this app's own picker, reached via Job Jar's mirror-image
+  "Link to existing Job Tracker job" button) deliberately does **not** exclude already-linked
+  jobs — it lists every job, flags ones that already point elsewhere, and picking one anyway
+  overwrites that stale pointer, since re-picking is the only reliable way to fix a desync once
+  the two sides disagree.
 - Either "Open"/"Send"/"Link" button shows a "Job Jar isn't installed" toast instead of crashing
   if the target app isn't present (`ActivityNotFoundException`, in `ui/common/CrossAppLink.kt`).
 - **Because the link lives on the job row itself** (`linkedJobJarId`), a Job Jar *subtask* — just

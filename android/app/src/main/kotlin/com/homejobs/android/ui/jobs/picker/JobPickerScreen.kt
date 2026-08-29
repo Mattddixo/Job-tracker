@@ -1,6 +1,7 @@
 package com.homejobs.android.ui.jobs.picker
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,7 +49,7 @@ fun JobPickerScreen(
         },
     ) { padding ->
         if (jobs.isEmpty()) {
-            EmptyState("No unlinked jobs available to pick.", modifier = Modifier.padding(padding))
+            EmptyState("No jobs available to pick.", modifier = Modifier.padding(padding))
         } else {
             LazyColumn(
                 modifier = Modifier.padding(padding),
@@ -65,7 +66,19 @@ fun JobPickerScreen(
                             }
                         },
                     ) {
-                        Text(job.title, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyLarge)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(job.title, style = MaterialTheme.typography.bodyLarge)
+                            // Not excluded from the list — see JobPickerViewModel.pickableJobs —
+                            // but flagged so picking it is an informed choice: it'll overwrite
+                            // whatever this job was linked to before.
+                            if (job.linkedJobJarId != null) {
+                                Text(
+                                    "Already linked to a different job — picking this will re-point it here",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
                     }
                 }
             }
