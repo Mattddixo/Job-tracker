@@ -2,18 +2,12 @@ package com.homejobs.android.viewmodel
 
 import androidx.lifecycle.SavedStateHandle
 import com.homejobs.android.MainDispatcherRule
-import com.homejobs.android.data.parsing.QuotePdfImportResult
-import com.homejobs.android.data.parsing.QuotePdfParser
 import com.homejobs.android.domain.model.Job
-import com.homejobs.android.domain.model.ParsedQuote
 import com.homejobs.android.fakes.FakeJobRepository
 import com.homejobs.android.ui.jobs.form.JobFormViewModel
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -23,15 +17,10 @@ class JobFormViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private fun viewModel(
-        savedStateHandle: SavedStateHandle = SavedStateHandle(),
-        repository: FakeJobRepository = FakeJobRepository(),
-        quotePdfParser: QuotePdfParser = mockk(relaxed = true),
-    ) = JobFormViewModel(savedStateHandle, repository, quotePdfParser)
-
     @Test
     fun `blank title fails validation and does not call the repository`() = runTest {
-        val viewModel = viewModel()
+        val repository = FakeJobRepository()
+        val viewModel = JobFormViewModel(SavedStateHandle(), repository)
         var savedCalled = false
 
         viewModel.save { savedCalled = true }
@@ -42,7 +31,8 @@ class JobFormViewModelTest {
 
     @Test
     fun `valid input creates a job and invokes onSaved`() = runTest {
-        val viewModel = viewModel()
+        val repository = FakeJobRepository()
+        val viewModel = JobFormViewModel(SavedStateHandle(), repository)
         var savedCalled = false
 
         viewModel.updateInput { it.copy(title = "Replace gutters") }
@@ -54,62 +44,13 @@ class JobFormViewModelTest {
 
     @Test
     fun `negative cost fails validation`() = runTest {
-        val viewModel = viewModel()
+        val repository = FakeJobRepository()
+        val viewModel = JobFormViewModel(SavedStateHandle(), repository)
 
         viewModel.updateInput { it.copy(title = "Job", quotedCost = -50.0) }
         viewModel.save {}
 
         assertTrue(viewModel.uiState.value.errors.any { it.contains("negative") })
-    }
-
-    @Test
-    fun `importing a PDF fills only the fields it found and reports what happened`() = runTest {
-        val parser = mockk<QuotePdfParser>()
-        every { parser.parse(any()) } returns QuotePdfImportResult(
-            quote = ParsedQuote(vendorName = "ABC Plumbing", quotedCost = 450.0),
-            hasTextLayer = true,
-        )
-        val viewModel = viewModel(quotePdfParser = parser)
-        viewModel.updateInput { it.copy(title = "Job", vendorContact = "already set") }
-
-        viewModel.importFromPdf(mockk(relaxed = true))
-
-        val state = viewModel.uiState.value
-        assertEquals("ABC Plumbing", state.input.vendorName)
-        assertEquals(450.0, state.input.quotedCost)
-        assertEquals("already set", state.input.vendorContact) // untouched: parser found nothing for it
-        assertTrue(state.pdfImportMessage!!.contains("vendor"))
-        assertTrue(state.pdfImportMessage!!.contains("quoted cost"))
-        assertFalse(state.isImportingPdf)
-    }
-
-    @Test
-    fun `importing a PDF with nothing recognizable leaves the form untouched`() = runTest {
-        val parser = mockk<QuotePdfParser>()
-        every { parser.parse(any()) } returns QuotePdfImportResult(quote = ParsedQuote(), hasTextLayer = true)
-        val viewModel = viewModel(quotePdfParser = parser)
-        viewModel.updateInput { it.copy(title = "Job", vendorName = "Existing vendor") }
-
-        viewModel.importFromPdf(mockk(relaxed = true))
-
-        val state = viewModel.uiState.value
-        assertEquals("Existing vendor", state.input.vendorName)
-        assertNull(state.input.quotedCost)
-        assertTrue(state.pdfImportMessage!!.contains("enter details manually"))
-    }
-
-    @Test
-    fun `importing a scanned-image PDF reports that there's no text to read, not a generic miss`() = runTest {
-        val parser = mockk<QuotePdfParser>()
-        every { parser.parse(any()) } returns QuotePdfImportResult(quote = ParsedQuote(), hasTextLayer = false)
-        val viewModel = viewModel(quotePdfParser = parser)
-        viewModel.updateInput { it.copy(title = "Job", vendorName = "Existing vendor") }
-
-        viewModel.importFromPdf(mockk(relaxed = true))
-
-        val state = viewModel.uiState.value
-        assertEquals("Existing vendor", state.input.vendorName) // untouched
-        assertTrue(state.pdfImportMessage!!.contains("scanned image"))
     }
 
     @Test
@@ -138,7 +79,7 @@ class JobFormViewModelTest {
             ),
         )
 
-        val viewModel = viewModel(savedStateHandle = SavedStateHandle(mapOf("jobId" to "42")), repository = repository)
+        val viewModel = JobFormViewModel(SavedStateHandle(mapOf("jobId" to "42")), repository)
 
         assertEquals("Existing job", viewModel.uiState.value.input.title)
         assertEquals("HVAC", viewModel.uiState.value.input.category)

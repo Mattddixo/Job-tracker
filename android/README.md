@@ -24,26 +24,22 @@ Room is the only store.
 - Room as the **only** persistence layer (no network, no remote sync)
 - Hilt for dependency injection
 - Coil for loading locally-stored photo files into Compose
-- [pdfbox-android](https://github.com/TomRoush/PdfBox-Android) for on-device text extraction from
-  a picked PDF quote — no network call, same offline-only stance as everything else here
 
 ## Project layout
 
 ```
 app/src/main/kotlin/com/homejobs/android/
   domain/            pure Kotlin models + the JobRepository interface — no Room/Android types
-    parsing/           QuoteTextParser — pure heuristics over already-extracted PDF text
   data/
     local/db/         Room entities, DAOs, database (jobs, job_notes, photos)
     local/photo/       PhotoStorage — copies camera/gallery images into app-private storage
     local/prefs/       ThemePreferences — persisted theme mode + color palette choice
-    parsing/           QuotePdfParser — Android/PDFBox glue that feeds QuoteTextParser
     repository/       JobRepositoryImpl (Room-backed) + Entity/domain mappers
   di/                 Hilt modules (database, repository)
   ui/
     jobs/list/        job list screen + ViewModel (Active/Completed/All tabs, sort)
     jobs/detail/       job detail + notes timeline + photo capture/viewer + ViewModel
-    jobs/form/         sectioned create/edit form + ViewModel + PDF-quote import
+    jobs/form/         sectioned create/edit form + ViewModel
     jobs/photos/       all-photos grid for a job + ViewModel
     stats/             cost-by-payment-method stats + manage payment methods + ViewModel
     appearance/        Light/Dark/Custom toggle + color wheel picker screen
@@ -54,7 +50,6 @@ app/src/test/kotlin/com/homejobs/android/
   fakes/              hand-written fakes for JobRepository and the Room DAOs
   viewmodel/          ViewModel unit tests
   repository/         JobRepositoryImpl unit tests
-  parsing/            QuoteTextParser unit tests
 ```
 
 ## Architecture notes
@@ -144,40 +139,6 @@ app/src/test/kotlin/com/homejobs/android/
   not its dollar totals — with a "$X of $Y limit used" bar against `maxCredit`.
   `PaymentMethodsScreen` is the add/edit/delete CRUD list, sharing the same `StatsViewModel`
   (and thus the same job-count-per-method data, for its delete confirmation) as `StatsScreen`.
-- **A PDF quote can pre-fill the job form, but only the fields it's actually confident about.**
-  A PDF icon in `JobFormScreen`'s top bar opens Android's document picker (`ACTION_OPEN_DOCUMENT`,
-  filtered to `application/pdf` — a system intent, no storage permission needed); the picked file
-  is read straight off its `content://` Uri and never copied to disk, since it's only needed for
-  the few seconds it takes to parse. `QuotePdfParser` (`data/parsing/`) extracts the PDF's text
-  layer with pdfbox-android and hands it to `QuoteTextParser` (`domain/parsing/`, pure Kotlin —
-  no Android or PDFBox types, so its regex heuristics are unit-tested as plain string-in,
-  data-out logic). Only three fields are ever touched — **vendor name**, **vendor contact**
-  (email preferred, phone as a fallback), and **quoted cost** — and each one comes back `null`
-  unless a pattern matched with real confidence: the cost heuristic requires a dollar amount
-  (cents mandatory unless a `$` is present — a bare "Total items: 5" doesn't get grabbed just
-  because it follows the word "total") sitting next to a total-style label (checking specific
-  labels like "Grand Total" / "Balance Due" / "Total Amount Due" before falling back to a bare
-  "Total", so a later grand total wins over an earlier subtotal) rather than grabbing the first
-  dollar figure on the page. The vendor-name heuristic skips lines that are clearly a
-  phone/email/address, mostly-digits (an invoice/PO number or a date), or — matched by a regex,
-  not exact equality, after a real invoice tripped up an earlier version that only excluded a
-  line that was *exactly* the word "invoice" — a document-type heading such as "Tax Invoice",
-  "Invoice #4471", or "Invoice Data" all followed by other words. A field the parser doesn't find
-  is left exactly as it was — nothing is cleared, nothing is invented — and the import result
-  ("Imported from PDF: vendor, quoted cost." or "Couldn't find a vendor, contact, or total…") is
-  shown back so a still-blank field isn't mistaken for one that was checked and found empty.
-  Every imported value lands in the same editable text field a hand-typed one would, so it's
-  reviewed (and correctable) before Save is ever pressed — nothing from a PDF is written to the
-  database directly.
-  A **scanned or "print to PDF" image** (a photographed or screenshotted invoice with no real
-  text behind it — confirmed by checking a real-world test file this way: it had zero embedded
-  fonts, every page was a flattened JPEG) can't be read by any text-based parser, PDFBox included.
-  Rather than silently returning three nulls and looking like a parsing failure,
-  `QuotePdfImportResult.hasTextLayer` flags this case explicitly (extracted text under ~20
-  characters counts as "none"), and the form says so directly — "That PDF looks like a scanned
-  image, so there's no text to read it from" — instead of the generic "couldn't find anything"
-  message. Actually reading a scanned quote needs OCR, which is a separate, not-yet-built
-  follow-up (see the invoice-digestion discussion this feature grew out of).
 
 ## Running it
 
@@ -202,9 +163,9 @@ yourself with a local Gradle install and Android SDK/network access.
 ## Permissions
 
 None beyond what's needed to write photo files the app itself creates. No `INTERNET`
-permission — there's nothing to talk to. The camera and gallery pickers, and the PDF-quote
-picker, are launched via system intents (`ACTION_IMAGE_CAPTURE`, the Android Photo Picker,
-`ACTION_OPEN_DOCUMENT`), so none of them needs a runtime permission request from this app.
+permission — there's nothing to talk to. The camera and gallery pickers are launched via
+system intents (`ACTION_IMAGE_CAPTURE`, the Android Photo Picker), so neither needs a runtime
+permission request from this app.
 
 ## Backing up your data
 
@@ -234,22 +195,10 @@ logic worth re-implementing in a fake. Covered:
 - `JobListViewModelTest` — status filtering, Active/Completed/All tab grouping, delete
   delegation.
 - `JobFormViewModelTest` — validation blocks save on bad input, valid input creates a job and
-  fires the callback, editing pre-populates the form from the repository, importing a PDF fills
-  only the fields a (mocked) parser actually found and leaves the rest of the form untouched,
-  importing a PDF with nothing recognizable leaves every field as it was, importing a
-  scanned-image PDF (`hasTextLayer = false`) reports that distinctly rather than a generic
-  "nothing found".
+  fires the callback, editing pre-populates the form from the repository.
 - `StatsViewModelTest` — the paid/partial/unpaid grouping-by-method logic: sums split correctly
   by `PaymentStatus`, a job with no `actualCost` counts toward `jobCount` but no total, jobs with
   no payment method land in an "Unassigned" bucket that's omitted when it would be empty.
-- `QuoteTextParserTest` — the actual regex heuristics behind PDF import: vendor name/contact/cost
-  extraction from a realistic quote layout, a specific "Grand Total" winning over an earlier
-  generic "Subtotal", a bare line-item price (and a bare count like "Total items: 5") with no
-  total-style dollar amount correctly *not* being treated as the total, a whole-dollar total with
-  no cents still being recognized when a `$` is present, a heading line with extra words around
-  it ("Invoice Data", "Invoice #4471") correctly being excluded from the vendor-name guess instead
-  of only an exact "invoice" match, and a text blob with no recognizable structure coming back
-  with every field null instead of a wrong guess.
 - `DateFormattingTest` — date/date-time display formatting, including that sub-minute
   precision never leaks into what's shown.
 
