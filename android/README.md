@@ -228,6 +228,17 @@ would have to be pressed once per bounce before it did anything visible.
   Job Jar's own create form does. This only ever happens via **Send**, never **Link** (which just
   points two already-existing jobs at each other), and only at the moment of creation — later
   edits on either side aren't kept in sync.
+- **Completing a linked job nudges you to update Job Jar.** Editing a linked job's status to Done
+  and saving shows a small, dismissible Snackbar on return to the job's detail screen — "Want to
+  update the linked Job Jar task?" — with an **Open** action that jumps straight to it
+  (`jobjar://job/{id}`). `JobFormViewModel` tracks the status the job had when the edit started
+  and only reports this back to the screen when *this* save is what actually moved it into Done —
+  never on a save that leaves an already-Done job Done, and never on an unlinked job. Since saving
+  pops straight back to the previous screen, the signal rides along via
+  `navController.previousBackStackEntry?.savedStateHandle` (the same mechanism `JobPhotosScreen`
+  already uses for "scroll to this note on return"), consumed once so it doesn't re-fire if you
+  land on the same detail screen again later. Job Jar does the same in reverse when you mark a
+  linked job (or its repeating cycle) done.
 
 ## Backing up your data
 

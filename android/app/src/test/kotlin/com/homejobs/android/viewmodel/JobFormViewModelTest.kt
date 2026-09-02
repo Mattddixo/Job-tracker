@@ -23,7 +23,7 @@ class JobFormViewModelTest {
         val viewModel = JobFormViewModel(SavedStateHandle(), repository)
         var savedCalled = false
 
-        viewModel.save { _, _ -> savedCalled = true }
+        viewModel.save { _, _, _ -> savedCalled = true }
 
         assertFalse(savedCalled)
         assertTrue(viewModel.uiState.value.errors.isNotEmpty())
@@ -36,7 +36,7 @@ class JobFormViewModelTest {
         var savedCalled = false
 
         viewModel.updateInput { it.copy(title = "Replace gutters") }
-        viewModel.save { _, _ -> savedCalled = true }
+        viewModel.save { _, _, _ -> savedCalled = true }
 
         assertTrue(savedCalled)
         assertTrue(viewModel.uiState.value.errors.isEmpty())
@@ -48,7 +48,7 @@ class JobFormViewModelTest {
         val viewModel = JobFormViewModel(SavedStateHandle(), repository)
 
         viewModel.updateInput { it.copy(title = "Job", quotedCost = -50.0) }
-        viewModel.save { _, _ -> }
+        viewModel.save { _, _, _ -> }
 
         assertTrue(viewModel.uiState.value.errors.any { it.contains("negative") })
     }
@@ -119,7 +119,7 @@ class JobFormViewModelTest {
 
         viewModel.updateInput { it.copy(vendorName = "Acme Plumbing") }
         var savedJob: Job? = null
-        viewModel.save { job, _ -> savedJob = job }
+        viewModel.save { job, _, _ -> savedJob = job }
 
         assertEquals(7L, savedJob?.linkedJobJarId)
     }
@@ -163,9 +163,79 @@ class JobFormViewModelTest {
         var isNewlyCreated: Boolean? = null
 
         viewModel.updateInput { it.copy(title = "New job") }
-        viewModel.save { _, newlyCreated -> isNewlyCreated = newlyCreated }
+        viewModel.save { _, newlyCreated, _ -> isNewlyCreated = newlyCreated }
 
         assertEquals(true, isNewlyCreated)
+    }
+
+    @Test
+    fun `save signals a completed linked job so the screen can nudge to update Job Jar`() = runTest {
+        val repository = FakeJobRepository()
+        repository.jobsState.value = listOf(
+            Job(
+                id = 42,
+                title = "Existing job",
+                category = null,
+                location = null,
+                vendorName = null,
+                vendorContact = null,
+                status = com.homejobs.android.domain.model.JobStatus.SCHEDULED,
+                quotedCost = null,
+                actualCost = null,
+                predictedHours = null,
+                actualHours = null,
+                scheduledDate = null,
+                completedDate = null,
+                warrantyExpiry = null,
+                paymentStatus = com.homejobs.android.domain.model.PaymentStatus.UNPAID,
+                paymentMethodId = null,
+                createdAt = 0L,
+                updatedAt = 0L,
+                linkedJobJarId = 7,
+            ),
+        )
+        val viewModel = JobFormViewModel(SavedStateHandle(mapOf("jobId" to "42")), repository)
+        var justCompletedLinkedJobJarId: Long? = null
+
+        viewModel.updateInput { it.copy(status = com.homejobs.android.domain.model.JobStatus.DONE) }
+        viewModel.save { _, _, jobJarId -> justCompletedLinkedJobJarId = jobJarId }
+
+        assertEquals(7L, justCompletedLinkedJobJarId)
+    }
+
+    @Test
+    fun `saving without changing status away from DONE does not re-signal the nudge`() = runTest {
+        val repository = FakeJobRepository()
+        repository.jobsState.value = listOf(
+            Job(
+                id = 42,
+                title = "Existing job",
+                category = null,
+                location = null,
+                vendorName = null,
+                vendorContact = null,
+                status = com.homejobs.android.domain.model.JobStatus.DONE,
+                quotedCost = null,
+                actualCost = null,
+                predictedHours = null,
+                actualHours = null,
+                scheduledDate = null,
+                completedDate = null,
+                warrantyExpiry = null,
+                paymentStatus = com.homejobs.android.domain.model.PaymentStatus.UNPAID,
+                paymentMethodId = null,
+                createdAt = 0L,
+                updatedAt = 0L,
+                linkedJobJarId = 7,
+            ),
+        )
+        val viewModel = JobFormViewModel(SavedStateHandle(mapOf("jobId" to "42")), repository)
+        var justCompletedLinkedJobJarId: Long? = null
+
+        viewModel.updateInput { it.copy(vendorName = "Acme Plumbing") }
+        viewModel.save { _, _, jobJarId -> justCompletedLinkedJobJarId = jobJarId }
+
+        assertEquals(null, justCompletedLinkedJobJarId)
     }
 
     @Test
@@ -197,7 +267,7 @@ class JobFormViewModelTest {
         val viewModel = JobFormViewModel(SavedStateHandle(mapOf("jobId" to "42")), repository)
         var isNewlyCreated: Boolean? = null
 
-        viewModel.save { _, newlyCreated -> isNewlyCreated = newlyCreated }
+        viewModel.save { _, newlyCreated, _ -> isNewlyCreated = newlyCreated }
 
         assertEquals(false, isNewlyCreated)
     }

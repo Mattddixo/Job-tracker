@@ -63,11 +63,17 @@ fun HomeJobsNavGraph(
             val scrollToNoteId = remember(backStackEntry) {
                 backStackEntry.savedStateHandle.remove<Long>("scrollToNoteId")
             }
+            // Same pattern, for the "want to update the linked Job Jar task?" nudge left by
+            // JobFormScreen when an edit-save just moved this job into DONE.
+            val justCompletedLinkedJobJarId = remember(backStackEntry) {
+                backStackEntry.savedStateHandle.remove<Long>("justCompletedLinkedJobJarId")
+            }
             JobDetailScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { id -> navController.navigate(Routes.jobFormEdit(id)) },
                 onViewPhotos = { id, photoId -> navController.navigate(Routes.jobPhotos(id, photoId)) },
                 scrollToNoteId = scrollToNoteId,
+                justCompletedLinkedJobJarId = justCompletedLinkedJobJarId,
             )
         }
         composable(
@@ -83,7 +89,13 @@ fun HomeJobsNavGraph(
         ) {
             JobFormScreen(
                 onBack = { navController.popBackStack() },
-                onSaved = { navController.popBackStack() },
+                onSaved = { justCompletedLinkedJobJarId ->
+                    if (justCompletedLinkedJobJarId != null) {
+                        navController.previousBackStackEntry?.savedStateHandle
+                            ?.set("justCompletedLinkedJobJarId", justCompletedLinkedJobJarId)
+                    }
+                    navController.popBackStack()
+                },
             )
         }
         composable(

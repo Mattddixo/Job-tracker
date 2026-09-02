@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homejobs.android.domain.model.Job
+import com.homejobs.android.domain.model.JobStatus
 import com.homejobs.android.domain.model.JobUpsertInput
 import com.homejobs.android.domain.repository.JobRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +23,11 @@ class JobFormViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val jobId: Long? = (savedStateHandle.get<String>("jobId"))?.toLongOrNull()
+
+    // The status this job had when it was loaded for editing, before any changes made in this
+    // session - used by save() to tell whether *this* save is what just moved it into DONE,
+    // rather than it having already been DONE going in (see justCompletedLinkedJobJarId).
+    private var originalStatus: JobStatus? = null
 
     // Populated only when this form was opened via a hometracker://newjob deep link (e.g. Job
     // Jar's "Send to Job Tracker" button) — see DeepLink.kt / Routes.jobFormFromDeepLink.
@@ -66,6 +72,7 @@ class JobFormViewModel @Inject constructor(
         if (id != null) {
             viewModelScope.launch {
                 val job = repository.observeJob(id).filterNotNull().first()
+                originalStatus = job.status
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     input = JobUpsertInput(
@@ -104,12 +111,14 @@ class JobFormViewModel @Inject constructor(
     }
 
     /**
-     * [onResult] gets the saved job plus whether this was a fresh create (vs. editing an
-     * existing one) — the screen uses [isNewlyCreated] to decide whether to fire a
-     * `jobjar://linked` return callback (only ever on the create that just established a link,
-     * never on a later edit-save of an already-linked job).
+     * [onResult] gets the saved job, whether this was a fresh create (vs. editing an existing
+     * one), and — only when this exact save is what just moved a *linked* job into
+     * [JobStatus.DONE] — that Job Jar id, so the screen can nudge "want to update the linked Job
+     * Jar task?" without also firing on a save that leaves an already-done job alone or that
+     * changes some other field on it. [isNewlyCreated] separately gates the `jobjar://linked`
+     * return callback (only ever on the create that just established a link).
      */
-    fun save(onResult: (job: Job, isNewlyCreated: Boolean) -> Unit) {
+    fun save(onResult: (job: Job, isNewlyCreated: Boolean, justCompletedLinkedJobJarId: Long?) -> Unit) {
         val input = _uiState.value.input
         val errors = input.validate()
         if (errors.isNotEmpty()) {
@@ -121,8 +130,14 @@ class JobFormViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isSaving = true, saveError = null)
             try {
                 val id = jobId
+                val wasDone = originalStatus == JobStatus.DONE
                 val savedJob = if (id != null) repository.updateJob(id, input) else repository.createJob(input)
-                onResult(savedJob, id == null)
+                val justCompletedLinkedJobJarId = if (!wasDone && savedJob.status == JobStatus.DONE) {
+                    savedJob.linkedJobJarId
+                } else {
+                    null
+                }
+                onResult(savedJob, id == null, justCompletedLinkedJobJarId)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(saveError = e.message ?: "Failed to save job")
             }

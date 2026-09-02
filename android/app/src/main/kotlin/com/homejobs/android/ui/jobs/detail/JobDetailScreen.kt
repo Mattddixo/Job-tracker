@@ -38,6 +38,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -82,11 +86,32 @@ fun JobDetailScreen(
     onEdit: (Long) -> Unit,
     onViewPhotos: (Long, Long?) -> Unit,
     scrollToNoteId: Long? = null,
+    justCompletedLinkedJobJarId: Long? = null,
     viewModel: JobDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    // Left by JobFormScreen's onSaved (via NavGraph's previousBackStackEntry.savedStateHandle,
+    // same mechanism as scrollToNoteId above) when an edit-save just moved this job into DONE
+    // and it was linked to a Job Jar task. Runs once per non-null value delivered, not on every
+    // recomposition, since justCompletedLinkedJobJarId is consumed (removed from the
+    // SavedStateHandle) before it ever reaches this screen.
+    LaunchedEffect(justCompletedLinkedJobJarId) {
+        val jobJarId = justCompletedLinkedJobJarId ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Want to update the linked Job Jar task?",
+            actionLabel = "Open",
+            duration = SnackbarDuration.Short,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            openInJobJar(context, Uri.parse("jobjar://job/$jobJarId"))
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Job details") },

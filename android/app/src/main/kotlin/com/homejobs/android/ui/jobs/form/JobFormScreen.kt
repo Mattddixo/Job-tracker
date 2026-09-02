@@ -59,7 +59,7 @@ import kotlin.math.abs
 @Composable
 fun JobFormScreen(
     onBack: () -> Unit,
-    onSaved: () -> Unit,
+    onSaved: (justCompletedLinkedJobJarId: Long?) -> Unit,
     viewModel: JobFormViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -220,7 +220,7 @@ fun JobFormScreen(
 
             Button(
                 onClick = {
-                    viewModel.save { job, isNewlyCreated ->
+                    viewModel.save { job, isNewlyCreated, justCompletedLinkedJobJarId ->
                         // Only on the create that just established a link — never on a later
                         // edit-save of an already-linked job, which would otherwise re-fire this
                         // and bounce Job Jar to the foreground on every unrelated edit.
@@ -229,7 +229,7 @@ fun JobFormScreen(
                                 fireLinkedCallback(context, jobJarId = jobJarId, trackerJobId = job.id)
                             }
                         }
-                        onSaved()
+                        onSaved(justCompletedLinkedJobJarId)
                     }
                 },
                 enabled = !uiState.isSaving,
